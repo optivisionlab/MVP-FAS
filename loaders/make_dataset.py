@@ -1,6 +1,9 @@
 import torchvision.transforms as transforms
 from loaders.MCIO import MCIO_Dataset
 from loaders.SFW import SFW_Dataset
+from loaders.custom_dataset import FAS_Dataset
+import pandas as pd
+
 def get_MCIO_dataset(cfg,train='CIO',test='M',img_size= (224, 224), normalize=None,):
 
     train_dataset = MCIO_Dataset(cfg=cfg,datasets=train,
@@ -21,15 +24,35 @@ def get_SFW_dataset(cfg,train='SF',test='W',img_size= (224, 224), normalize=None
     return train_dataset, val_dataset
 
 
-def get_Dataset(cfg,SETTING="MCIO"):
+def get_FAS_dataset(args, cfg, normalize=None, img_size=(224, 224)):
+
+    train_df = pd.read_csv(args.train_csv, usecols=['path', 'is_spoof'])
+    val_df = pd.read_csv(args.val_csv, usecols=['path', 'is_spoof'])
+
+    train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_df, base_dir=args.root_dir, 
+                                transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                                is_train=True)
+    
+    val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_df, base_dir=args.root_dir, 
+                              transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                              is_train=False)
+
+    return train_dataset, val_dataset
+
+
+def get_Dataset(args, cfg, SETTING="MCIO"):
     normalize = transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
+    
     if SETTING == "MCIO":
-        train_dataset, val_dataset = get_MCIO_dataset(cfg,train=cfg.DATASET.TRAIN_DATASET,test=cfg.DATASET.TEST_DATASET,img_size= (cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE), normalize=normalize)
+        train_dataset, val_dataset = get_MCIO_dataset(cfg,train=cfg.DATASET.TRAIN_DATASET,test=cfg.DATASET.TEST_DATASET,
+                                                      img_size= (cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE), normalize=normalize)
     elif SETTING == 'SFW':
         train_dataset, val_dataset = get_SFW_dataset(cfg, train=cfg.DATASET.TRAIN_DATASET,
                                                       test=cfg.DATASET.TEST_DATASET,
                                                       img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE),
                                                       normalize=normalize)
+    elif SETTING == "fas":
+        train_dataset, val_dataset = get_FAS_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE))
 
     return train_dataset, val_dataset
 
