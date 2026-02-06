@@ -199,7 +199,6 @@ if __name__ == '__main__':
             loss.backward()
             optimizer.step()
 
-
             train_total_loss_history.append(loss.item())
             train_Sim_loss_history.append(Similarity_loss.item())
             
@@ -220,8 +219,8 @@ if __name__ == '__main__':
             eta = eta + val_eta
 
             line = '[Train] Epoch: {}/{} || Iter: {}/{} || ' \
-                   'This_iter: total_loss: {:.4f} ||' \
-                   'This_epoch: total_loss: {:.4f} Sim_loss: {:.4f} || ' \
+                   'Iter: total_loss: {:.4f} ||' \
+                   'Epoch: total_loss: {:.4f} Sim_loss: {:.4f} || ' \
                    'LR: {:.8f} || Batchtime: {:.4f} s || this_epoch: {}||ETA: {}'.format(
                 epoch + 1, max_epoch, batch_idx + 1, batch_iterator_len,
                 loss.item(), total_loss_mean, Similarity_loss_mean * Similarity_alpha, lr, batch_time, 
@@ -273,8 +272,8 @@ if __name__ == '__main__':
                     val_eta = val_eta + eta
 
                     val_line = '[VAL] Epoch: {}/{} || iter: {}/{} || ' \
-                               'This_iter: total_loss: {:.4f} || ' \
-                               'This_epoch: Sim_loss: {:.4f} HTER: {:.4f} AUC: {:.4f} TPR@FPR: {:.4f} top-1: {:.4f} || ' \
+                               'Iter: total_loss: {:.4f} || ' \
+                               'Epoch: Sim_loss: {:.4f} HTER: {:.4f} AUC: {:.4f} TPR@FPR: {:.4f} top-1: {:.4f} || ' \
                                'Batchtime: {:.4f} s || this_epoch: {} || ETA: {}'.format(
                         epoch + 1, max_epoch, val_batch_idx + 1, val_batch_iterator_len,
                         val_Similarity_loss,
@@ -310,7 +309,7 @@ if __name__ == '__main__':
                     best_ckpt_path = os.path.join(save_folder, 'weights', model_name + '_' + save_name + '_best_ckpt.pt')
                     torch.save({
                         'epoch': epoch + 1,
-                        'state_dict': net.module.state_dict(),
+                        'state_dict': net.state_dict(),
                         'performance': best_HTER * 100,
                         'optimizer': optimizer.state_dict(),
                     }, best_ckpt_path)
@@ -324,7 +323,7 @@ if __name__ == '__main__':
             if ((epoch + 1) % period == 0 and epoch > 0) and save_periodically == True:
                 torch.save({
                     'epoch': epoch + 1,
-                    'state_dict': net.module.state_dict(),
+                    'state_dict': net.state_dict(),
                     'performance': best_val_loss,
                     'optimizer': optimizer.state_dict(),
                 }, os.path.join(save_folder, 'weights', model_name + '_' + save_name + '_epoch_' + str(epoch + 1) + '.pt'))
@@ -334,7 +333,7 @@ if __name__ == '__main__':
         last_ckp_path = os.path.join(save_folder, 'weights', model_name + '_' + save_name + 'last_ckpt.pt')
         torch.save({
             'epoch': epoch + 1,
-            'state_dict': net.module.state_dict(),
+            'state_dict': net.state_dict(),
             'optimizer': optimizer.state_dict(),
             'performance': best_val_loss,
             'lr': lr
