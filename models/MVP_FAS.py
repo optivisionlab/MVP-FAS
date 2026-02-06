@@ -30,12 +30,12 @@ real_templates = [
 
 class mspt(nn.Module):
 
-    def __init__(self, cfg, device='cpu'):
+    def __init__(self, cfg, device='cpu', backbone="ViT-B/16"):
         super(mspt, self).__init__()
 
         self.head_type = 'cls'
         self.device = device
-        self.model, _ = clip.load("ViT-B/16", strict=False)
+        self.model, _ = clip.load(backbone, strict=False)
         self._freeze_stages(self.model, exclude_key=['visual','learnable'])
 
         self.cls_projection = Projection()
