@@ -30,11 +30,11 @@ real_templates = [
 
 class mspt(nn.Module):
 
-    def __init__(self,cfg):
+    def __init__(self, cfg, device='cpu'):
         super(mspt, self).__init__()
 
         self.head_type = 'cls'
-
+        self.device = device
         self.model, _ = clip.load("ViT-B/16", strict=False)
         self._freeze_stages(self.model, exclude_key=['visual','learnable'])
 
@@ -102,23 +102,23 @@ class mspt(nn.Module):
         return torch.sigmoid(patch_activations*10)
 
     def forward(self, input, target=None):
-
+                
         results = {'similarity': None, 'patch_alignment': None}
 
-        spoof_texts = clip.tokenize(spoof_templates).cuda(non_blocking=True)  # tokenize
-        real_texts = clip.tokenize(real_templates).cuda(non_blocking=True)  # tokenize
+        spoof_texts = clip.tokenize(spoof_templates).cuda(self.device, non_blocking=True)  # tokenize
+        real_texts = clip.tokenize(real_templates).cuda(self.device, non_blocking=True)  # tokenize
 
         # embed with text encoder
         spoof_class_embeddings = self.model.encode_text(spoof_texts)
         real_class_embeddings = self.model.encode_text(real_texts)
-        text_features = torch.cat([spoof_class_embeddings, real_class_embeddings]).cuda()
+        text_features = torch.cat([spoof_class_embeddings, real_class_embeddings]).cuda(self.device)
 
         spoof_class_embeddings = spoof_class_embeddings.mean(dim=0)
         real_class_embeddings = real_class_embeddings.mean(dim=0)
 
         # # # stack the embeddings for image-text similarity
         spoof_ensemble_weights = [spoof_class_embeddings, real_class_embeddings]
-        spoof_text_features = torch.stack(spoof_ensemble_weights, dim=0).cuda()
+        spoof_text_features = torch.stack(spoof_ensemble_weights, dim=0).cuda(self.device)
 
         cls_embedding, _, patch = self.model.encode_image(input)
 
