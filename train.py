@@ -10,7 +10,7 @@ import logging
 import torch
 from torch import optim
 from torch.utils.data import DataLoader
-
+from torch.utils.tensorboard import SummaryWriter
 from configs.cfg import _C as cfg
 
 from loaders.make_dataset import get_Dataset
@@ -62,12 +62,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Entry Fuction")
 
     parser.add_argument("--model", type=str, default="MVP_FAS", help="choose model")
-    parser.add_argument("--save_name", type=str, default="MVP_FAS", help="choose subname of model")
+    parser.add_argument("--backbone", type=str, default="RN50", help="choose subname of model")
     parser.add_argument("--batch_size", type=int, default=16, help="batch size for training")
-    parser.add_argument("--seed", type=int, default=0, help="random seed for training")
+    parser.add_argument("--seed", type=int, default=42, help="random seed for training")
     parser.add_argument("--resume", type=bool, default=False, help='resume')
-    parser.add_argument("--checkpoint", type=str, default='best_model.pth', help='for resume')
-    parser.add_argument("--setting", type=str, default='SFW', help='DATASET SETTING [MCIO, SFW]')
+    parser.add_argument("--periodically", type=bool, default=False, help='save periodically')
+    parser.add_argument("--checkpoint", type=str, default='best_model.pt', help='for resume')
+    parser.add_argument("--setting", type=str, default='fas', help='DATASET SETTING [MCIO, SFW, FAS]')
     parser.add_argument("--train_dataset", type=str, default='FW', help='TRAIN_DATASET')
     parser.add_argument("--test_dataset", type=str, default='S', help='TEST_DATASET')
     parser.add_argument('--train_csv', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof/metas/intra_test/train_label.txt")
@@ -75,6 +76,7 @@ if __name__ == '__main__':
     parser.add_argument('--root_dir', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof", help='Root directory of dataset')
     parser.add_argument('--input_size', type=int, default=256)
     parser.add_argument('--gpu_id', type=str, default=0)
+    parser.add_argument('--save_path', type=str, default="runs/save_model")
 
     args = parser.parse_args()
     
@@ -86,7 +88,7 @@ if __name__ == '__main__':
     now_time = datetime.datetime.now()
 
     model_name = args.model
-    save_name = args.save_name
+    save_name = args.backbone.replace("/", "-")
     batch_size = args.batch_size
     seed = args.seed
     resume = args.resume
@@ -100,15 +102,29 @@ if __name__ == '__main__':
 
     start_epoch = 0
     max_epoch = cfg.TRAIN.EPOCH
-    save_folder = './save_model'
+    
+    # --- Setup ----
+    os.makedirs(args.save_path, exist_ok=True)
+    count = len(os.listdir(os.path.join(args.save_path))) + 1
+    save_folder = os.path.join(args.save_path, f"train_{count}")
+    
+    print(f">>>>>>>>>>>>> Save training to : {save_folder} <<<<<<<<<<<<<<<<<<<")
+    
     save_folder = os.path.join(save_folder, model_name + '_' + save_name)
     createDirectory(save_folder)
+    createDirectory(directory=os.path.join(save_folder, 'weights'))
+    
     reference = './reference'
 
     logger_name = f'train_{save_name}.log'
     logger = create_logger(os.path.join(save_folder, logger_name))
+    
+    # --- TensorBoard ---
+    writer = SummaryWriter(log_dir=os.path.join(save_folder, "tensorboard-logs"))
+    
     logger.info(
         f'##############################################################################################################\n'
+        f'Save traning to : {save_folder}'
         f'Experiment history\n'
         f'save_name: {save_name}\n'
         f'year: {now_time.year} month: {now_time.month} day: {now_time.day} hour: {now_time.hour} min: {now_time.minute}\n'
@@ -119,7 +135,7 @@ if __name__ == '__main__':
     validation = True
     best_val_loss = np.inf
     best_HTER = np.inf
-    save_periodically = False
+    save_periodically = args.periodically
     period = 10
     PIN_MEMORY = True
     logger_interval = 10
@@ -130,7 +146,7 @@ if __name__ == '__main__':
     Patch_align_beta = cfg.TRAIN.PATCH_ALIGN_BETA
     # get dataset
     train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING)
-    net = get_network(cfg, net_name=model_name, device=device)
+    net = get_network(cfg, net_name=model_name, device=device, backbone=args.backbone)
     net.to(device)
     
     if cfg.TRAIN.OPTIMIZER == "adam":
@@ -171,6 +187,7 @@ if __name__ == '__main__':
             results = net(img, target)
             output_list = results['similarity']
             patch_alignment_results = results['patch_alignment']
+            
             ############################
 
             optimizer.zero_grad()
@@ -185,8 +202,8 @@ if __name__ == '__main__':
 
             train_total_loss_history.append(loss.item())
             train_Sim_loss_history.append(Similarity_loss.item())
-            total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(
-                train_Sim_loss_history).mean()
+            
+            total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(train_Sim_loss_history).mean()
 
             end_time = time.time()
             batch_time = end_time - start_time
@@ -202,13 +219,18 @@ if __name__ == '__main__':
                                      this_epoch=epoch, max_epoch=max_epoch)
             eta = eta + val_eta
 
-            line = 'Epoch:{}/{} || Epochiter: {}/{} || ' \
+            line = '[Train] Epoch: {}/{} || Iter: {}/{} || ' \
                    'This_iter: total_loss: {:.4f} ||' \
                    'This_epoch: total_loss: {:.4f} Sim_loss: {:.4f} || ' \
                    'LR: {:.8f} || Batchtime: {:.4f} s || this_epoch: {}||ETA: {}'.format(
                 epoch + 1, max_epoch, batch_idx + 1, batch_iterator_len,
-                loss.item(), total_loss_mean, Similarity_loss_mean * Similarity_alpha, lr, batch_time, str(datetime.timedelta(seconds=this_epoch_eta)), str(datetime.timedelta(seconds=eta)))
+                loss.item(), total_loss_mean, Similarity_loss_mean * Similarity_alpha, lr, batch_time, 
+                str(datetime.timedelta(seconds=this_epoch_eta)), str(datetime.timedelta(seconds=eta)))
+            
             if batch_idx % logger_interval == 0:
+                writer.add_scalar("train/total_loss", total_loss_mean, epoch + 1)
+                writer.add_scalar("train/Sim_loss", Similarity_loss_mean * Similarity_alpha, epoch + 1)
+                writer.add_scalar("train/LR", lr, epoch + 1)
                 logger.info(line)
 
 
@@ -234,13 +256,11 @@ if __name__ == '__main__':
                     val_Sim_loss_history.append(val_Similarity_loss)
                     val_Similarity_loss_mean = np.asarray(val_Sim_loss_history).mean()
 
-
                     # metric
                     # spoofing | real
                     #     0       1
                     prob = F.softmax(val_output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
                     val_acc, val_EER, val_HTER, val_auc, val_threshold, val_ACC_threshold, val_TPR_FPR_rate = val_metric(val_Is_real.cpu().numpy().tolist(),prob)
-
 
                     val_end_time = time.time()
                     val_batch_time = val_end_time - val_start_time
@@ -252,7 +272,7 @@ if __name__ == '__main__':
                                      this_epoch=epoch, max_epoch=max_epoch)
                     val_eta = val_eta + eta
 
-                    val_line = '[VAL][{}/{}] || iter: {}/{} || ' \
+                    val_line = '[VAL] Epoch: {}/{} || iter: {}/{} || ' \
                                'This_iter: total_loss: {:.4f} || ' \
                                'This_epoch: Sim_loss: {:.4f} HTER: {:.4f} AUC: {:.4f} TPR@FPR: {:.4f} top-1: {:.4f} || ' \
                                'Batchtime: {:.4f} s || this_epoch: {} || ETA: {}'.format(
@@ -261,6 +281,14 @@ if __name__ == '__main__':
                         val_Similarity_loss_mean * Similarity_alpha, val_HTER * 100, val_auc*100, val_TPR_FPR_rate, val_acc,
                         val_batch_time, str(datetime.timedelta(seconds=val_this_epoch_eta)),
                         str(datetime.timedelta(seconds=val_eta)))
+                    
+                    # ------ logs ------ 
+                    writer.add_scalar("val/total_loss", val_Similarity_loss, epoch + 1)
+                    writer.add_scalar("val/Sim_loss", val_Similarity_loss_mean * Similarity_alpha, epoch + 1)
+                    writer.add_scalar("val/HTER", val_HTER * 100, epoch + 1)
+                    writer.add_scalar("val/AUC", val_auc * 100, epoch + 1)
+                    writer.add_scalar("val/TPR@FPR", val_TPR_FPR_rate, epoch + 1)
+                    writer.add_scalar("val/Acc", val_acc, epoch + 1)
                     logger.info(val_line)
 
                 # for best NME
@@ -279,13 +307,16 @@ if __name__ == '__main__':
                     #     save_threshold = 0.10
                     #
                     # if best_HTER <= save_threshold:
-
+                    best_ckpt_path = os.path.join(save_folder, 'weights', model_name + '_' + save_name + '_best_ckpt.pt')
                     torch.save({
                         'epoch': epoch + 1,
                         'state_dict': net.module.state_dict(),
-                        'performance': best_HTER*100,
+                        'performance': best_HTER * 100,
                         'optimizer': optimizer.state_dict(),
-                    }, os.path.join(save_folder, model_name + '_' + save_name + '_best_HTER'+ '{:.2f}'.format(best_HTER) +'_'+ str(epoch + 1) + '.pth'))
+                    }, best_ckpt_path)
+                    
+                    
+                    print ("Save model best checkpoint to: ", best_ckpt_path)
 
             net.train()
 
@@ -296,7 +327,19 @@ if __name__ == '__main__':
                     'state_dict': net.module.state_dict(),
                     'performance': best_val_loss,
                     'optimizer': optimizer.state_dict(),
-                }, os.path.join(save_folder, model_name + '_' + save_name + '_epoch_' + str(epoch + 1) + '.pth'))
+                }, os.path.join(save_folder, 'weights', model_name + '_' + save_name + '_epoch_' + str(epoch + 1) + '.pt'))
+                print ("Save periodically model checkpoint to: ", os.path.join(save_folder, model_name + '_' + save_name + '_epoch_' + str(epoch + 1) + '.pt'))
+            
+        
+        last_ckp_path = os.path.join(save_folder, 'weights', model_name + '_' + save_name + 'last_ckpt.pt')
+        torch.save({
+            'epoch': epoch + 1,
+            'state_dict': net.module.state_dict(),
+            'optimizer': optimizer.state_dict(),
+            'performance': best_val_loss,
+            'lr': lr
+        }, last_ckp_path)
+        print(f"💾 Last checkpoint saved {last_ckp_path}")
 
         scheduler.step()
         lr = scheduler.state_dict()['_last_lr'][0]
