@@ -63,15 +63,25 @@ if __name__ == '__main__':
 
     parser.add_argument("--model", type=str, default="MVP_FAS", help="choose model")
     parser.add_argument("--save_name", type=str, default="MVP_FAS", help="choose subname of model")
-    parser.add_argument("--batch_size", type=int, default=18, help="batch size for training")
+    parser.add_argument("--batch_size", type=int, default=16, help="batch size for training")
     parser.add_argument("--seed", type=int, default=0, help="random seed for training")
     parser.add_argument("--resume", type=bool, default=False, help='resume')
     parser.add_argument("--checkpoint", type=str, default='best_model.pth', help='for resume')
     parser.add_argument("--setting", type=str, default='SFW', help='DATASET SETTING [MCIO, SFW]')
     parser.add_argument("--train_dataset", type=str, default='FW', help='TRAIN_DATASET')
     parser.add_argument("--test_dataset", type=str, default='S', help='TEST_DATASET')
+    parser.add_argument('--train_csv', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof/metas/intra_test/train_label.txt")
+    parser.add_argument('--val_csv', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof/metas/intra_test/test_label.txt")
+    parser.add_argument('--root_dir', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof", help='Root directory of dataset')
+    parser.add_argument('--input_size', type=int, default=256)
+    parser.add_argument('--gpu_id', type=str, default=0)
 
     args = parser.parse_args()
+    
+    # --- Device ---
+    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
+    
+    print("device : ", device)
 
     now_time = datetime.datetime.now()
 
@@ -119,9 +129,10 @@ if __name__ == '__main__':
     Similarity_alpha = cfg.TRAIN.SIMILARITY_ALPHA
     Patch_align_beta = cfg.TRAIN.PATCH_ALIGN_BETA
     # get dataset
-    train_Dataset, val_Dataset = get_Dataset(cfg, SETTING=cfg.DATASET.SETTING)
-    net = get_network(cfg, net_name=model_name)
-
+    train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING)
+    net = get_network(cfg, net_name=model_name, device=device)
+    net.to(device)
+    
     if cfg.TRAIN.OPTIMIZER == "adam":
         optimizer = optim.Adam(net.parameters(), lr=cfg.TRAIN.LR, weight_decay=cfg.TRAIN.WEIGHT_DECAY)
     elif cfg.TRAIN.OPTIMIZER == "adamw":
@@ -131,8 +142,8 @@ if __name__ == '__main__':
 
     if resume == True: net, optimizer, last_epoch = set_pretrained_setting(net, optimizer, os.path.join(reference, checkpoint))
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, cfg.TRAIN.LR_STEP, cfg.TRAIN.LR_FACTOR, last_epoch=last_epoch)
-    CE_loss, val_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy')
-    patch_align_CE_loss, val_patch_align_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy')
+    CE_loss, val_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
+    patch_align_CE_loss, val_patch_align_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
 
     val_batch_time = None
     batch_time = 0#None
@@ -151,11 +162,11 @@ if __name__ == '__main__':
         for batch_idx, (img, target) in enumerate(batch_iterator):
             start_time = time.time()
 
-            img = img.cuda()
+            img = img.cuda(device)
 
-            Is_real = target['Is_real'].cuda()
-            Domain = target['Domain']#.cuda()
-            Attack_type = target['Attack_type']#.cuda()
+            Is_real = target['Is_real'].cuda(device)
+            # Domain = target['Domain']#.cuda(device)
+            # Attack_type = target['Attack_type']#.cuda(device)
 
             results = net(img, target)
             output_list = results['similarity']
@@ -209,10 +220,10 @@ if __name__ == '__main__':
                 for val_batch_idx, (val_img, val_target) in enumerate(val_batch_iterator):
                     val_start_time = time.time()
 
-                    val_img = val_img.cuda()
-                    val_Is_real = val_target['Is_real'].cuda()
-                    val_Domain = val_target['Domain']#.cuda()
-                    val_Attack_type = val_target['Attack_type']#.cuda()
+                    val_img = val_img.cuda(device)
+                    val_Is_real = val_target['Is_real'].cuda(device)
+                    # val_Domain = val_target['Domain']#.cuda(device)
+                    # val_Attack_type = val_target['Attack_type']#.cuda(device)
 
                     # forward
                     val_results = net(val_img)
