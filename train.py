@@ -58,6 +58,13 @@ def createDirectory(directory):
 
 
 if __name__ == '__main__':
+    
+    # VFT        35000
+    # oulu        4950
+    # Axonlab     2101
+    # SiW         1700
+    # CASIA        600
+    # MSU          280
 
     parser = argparse.ArgumentParser(description="Entry Fuction")
 
@@ -68,15 +75,19 @@ if __name__ == '__main__':
     parser.add_argument("--resume", type=bool, default=False, help='resume')
     parser.add_argument("--periodically", type=bool, default=False, help='save periodically')
     parser.add_argument("--checkpoint", type=str, default='best_model.pt', help='for resume')
-    parser.add_argument("--setting", type=str, default='fas', help='DATASET SETTING [MCIO, SFW, FAS]')
+    parser.add_argument("--setting", type=str, default='fas', help='DATASET SETTING [MCIO, SFW, FAS, ALL]')
     parser.add_argument("--train_dataset", type=str, default='FW', help='TRAIN_DATASET')
     parser.add_argument("--test_dataset", type=str, default='S', help='TEST_DATASET')
-    parser.add_argument('--train_csv', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof/metas/intra_test/train_label.txt")
-    parser.add_argument('--val_csv', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof/metas/intra_test/test_label.txt")
-    parser.add_argument('--root_dir', type=str, default="/data02/manhquang/dataset/celeba-spoof/CelebA_Spoof_/CelebA_Spoof", help='Root directory of dataset')
+    parser.add_argument('--train_csv', type=str, default="train_label.txt")
+    parser.add_argument('--val_csv', type=str, default="test_label.txt")
+    parser.add_argument('--root_dir', type=str, default="celeba-spoof/CelebA_Spoof_/CelebA_Spoof", help='Root directory of dataset')
+    parser.add_argument('--full_dataset_csv', type=str, default="full.csv")
+    parser.add_argument("--key_train", type=str, default='VFT,oulu,Axonlab,SiW', help='DATASET TRAIN [VFT, oulu, Axonlab, SiW]')
+    parser.add_argument("--key_val", type=str, default='CASIA,MSU', help='DATASET VAL [CASIA, MSU]')
     parser.add_argument('--input_size', type=int, default=256)
     parser.add_argument('--gpu_id', type=str, default=0)
     parser.add_argument('--save_path', type=str, default="runs/save_model")
+    parser.add_argument('--num_epochs', type=int, default="number of epochs")
 
     args = parser.parse_args()
     
@@ -94,6 +105,7 @@ if __name__ == '__main__':
     resume = args.resume
     checkpoint = args.checkpoint
 
+    cfg['TRAIN']['EPOCH'] = args.num_epochs
     cfg['DATASET']['SETTING'] = args.setting
     cfg['DATASET']['TRAIN_DATASET'] = args.train_dataset
     cfg['DATASET']['TEST_DATASET'] = args.test_dataset
@@ -162,7 +174,7 @@ if __name__ == '__main__':
     patch_align_CE_loss, val_patch_align_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
 
     val_batch_time = None
-    batch_time = 0#None
+    batch_time = 0 #None
 
     net.train()
     for epoch in range(start_epoch, max_epoch):
@@ -293,11 +305,10 @@ if __name__ == '__main__':
                 # for best NME
                 if (val_HTER) < best_HTER:
                     print('\n')
-                    new_update = f'congratulation!!!! best HTER is updated!!!!{best_HTER*100}-->{val_HTER*100}'
+                    new_update = f'Congratulation Best HTER is updated, best_HTER: {best_HTER*100} upto val_HTER: {val_HTER*100}'
                     logger.info(new_update)
                     best_HTER = val_HTER
-                    logger.info('=> saving checkpoint to {}'.format(
-                        os.path.join(save_folder, model_name + '_' + save_name + '_best.pth')))
+                    logger.info('=> saving checkpoint to {}'.format(os.path.join(save_folder, model_name + '_' + save_name + '_best.pt')))
 
                     # save_threshold = 0.05
                     # if cfg.DATASET.SETTING == 'SFW':

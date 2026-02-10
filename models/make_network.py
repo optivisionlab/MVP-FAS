@@ -3,7 +3,6 @@ import torch
 from models.MVP_FAS import mspt
 def get_network(cfg, net_name='MVP_FAS', device='cpu', backbone='ViT-B/16'):
     if net_name == 'MVP_FAS':
-        print("net_name")
         net = mspt(cfg, device=device, backbone=backbone)
     # net = torch.nn.DataParallel(net).cuda()
     return net

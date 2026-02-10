@@ -3,6 +3,8 @@ from loaders.MCIO import MCIO_Dataset
 from loaders.SFW import SFW_Dataset
 from loaders.custom_dataset import FAS_Dataset
 import pandas as pd
+from sklearn.utils import shuffle
+
 
 def get_MCIO_dataset(cfg,train='CIO',test='M',img_size= (224, 224), normalize=None,):
 
@@ -26,8 +28,8 @@ def get_SFW_dataset(cfg,train='SF',test='W',img_size= (224, 224), normalize=None
 
 def get_FAS_dataset(args, cfg, normalize=None, img_size=(224, 224)):
 
-    train_df = pd.read_csv(args.train_csv, usecols=['path', 'is_spoof'])
-    val_df = pd.read_csv(args.val_csv, usecols=['path', 'is_spoof'])
+    train_df = shuffle(pd.read_csv(args.train_csv, usecols=['path', 'is_spoof']), random_state=args.seed)
+    val_df = shuffle(pd.read_csv(args.val_csv, usecols=['path', 'is_spoof']), random_state=args.seed)
 
     train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_df, base_dir=args.root_dir, 
                                 transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
@@ -40,19 +42,41 @@ def get_FAS_dataset(args, cfg, normalize=None, img_size=(224, 224)):
     return train_dataset, val_dataset
 
 
+def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224)):
+    full_df = pd.read_csv(args.full_dataset_csv)
+    train_object = args.key_train.split(",")
+    val_object = args.key_val.split(",")
+    
+    train_full_df = shuffle(full_df[full_df['object'].isin(train_object)], random_state=args.seed)
+    val_full_df = shuffle(full_df[full_df['object'].isin(val_object)], random_state=args.seed)
+    
+    train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df, base_dir=args.root_dir, 
+                                transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                                is_train=True)
+    
+    val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df, base_dir=args.root_dir, 
+                              transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                              is_train=False)
+    
+    return train_dataset, val_dataset
+
+
 def get_Dataset(args, cfg, SETTING="MCIO"):
     normalize = transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
     
-    if SETTING == "MCIO":
+    if SETTING.upper() == "MCIO":
         train_dataset, val_dataset = get_MCIO_dataset(cfg,train=cfg.DATASET.TRAIN_DATASET,test=cfg.DATASET.TEST_DATASET,
                                                       img_size= (cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE), normalize=normalize)
-    elif SETTING == 'SFW':
+    elif SETTING.upper() == 'SFW':
         train_dataset, val_dataset = get_SFW_dataset(cfg, train=cfg.DATASET.TRAIN_DATASET,
                                                       test=cfg.DATASET.TEST_DATASET,
                                                       img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE),
                                                       normalize=normalize)
-    elif SETTING == "fas":
+    elif SETTING.upper() == "FAS":
         train_dataset, val_dataset = get_FAS_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE))
+
+    elif SETTING.upper() == 'ALL':
+        train_dataset, val_dataset = get_ALL_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE))
 
     return train_dataset, val_dataset
 
