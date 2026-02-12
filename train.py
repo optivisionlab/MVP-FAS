@@ -158,7 +158,7 @@ if __name__ == '__main__':
     Patch_align_beta = cfg.TRAIN.PATCH_ALIGN_BETA
     # get dataset
     train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING)
-    net = get_network(cfg, net_name=model_name, device=device, backbone=args.backbone)
+    net = get_network(cfg=cfg, args=args, net_name=model_name, device=device, backbone=args.backbone)
     net.to(device)
     
     if cfg.TRAIN.OPTIMIZER == "adam":

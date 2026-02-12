@@ -1,13 +1,10 @@
 import torch
 from torch import nn
-
+import random
 import torch.nn.functional as F
-
 from models.CLIP import clip
 from models.modules.slot_attention_PQTK import SlotAttention_PQTK
 from models.modules.head import Classifier, Slot_Projection, Projection
-
-
 import cv2
 import numpy as np
 
@@ -16,23 +13,60 @@ spoof_templates = [
     'spoof face',
     'attack face',
     'fake face',
-    # 'false face',
-    # 'deceptive face',
+    'replay attack face',
+    'video replay face',
+    'screen replay face',
+    'printed photo face',
+    'print attack face',
+    '2D attack face',
+    'silicone face',
+    'latex face',
+    '3D mask face',
+    'full mask face',
+    'plastic mask face',
+    'paper mask face',
+    'transparent mask face',
+    'half mask face',
+    'mannequin face',
+    'dummy face',
+    'wax figure face',
+    'doll face',
+    'makeup attack face',
+    'heavy makeup face',
+    'makeup obfuscation face',
+    'makeup impersonation face',
+    'partial occlusion face',
+    'covered mouth face',
+    'covered eye face',
+    'fake glasses face',
 ]
 
 real_templates = [
     'real face',
     'bonafide face',
     'genuine face',
-    # 'true face',
-    # 'verified face',
+    'true face',
+    'live face',
+    'live human face',
+    'natural face',
+    'authentic face',
+    'actual person face',
+    'valid face',
+    'legitimate face',
+    'normal face',
+    'clear human face',
+    'non-attack face',
+    'bona fide human face',
 ]
+
+details = ['a photo of a', 'an image of a']
 
 class mspt(nn.Module):
 
-    def __init__(self, cfg, device='cpu', backbone="ViT-B/16"):
+    def __init__(self, cfg, args, device='cpu', backbone="ViT-B/16"):
         super(mspt, self).__init__()
-
+        self.cfg = cfg
+        self.args = args
         self.head_type = 'cls'
         self.device = device
         self.model, _ = clip.load(backbone, strict=False)
@@ -104,9 +138,12 @@ class mspt(nn.Module):
     def forward(self, input, target=None):
                 
         results = {'similarity': None, 'patch_alignment': None}
-
-        spoof_texts = clip.tokenize(spoof_templates).cuda(self.device, non_blocking=True)  # tokenize
-        real_texts = clip.tokenize(real_templates).cuda(self.device, non_blocking=True)  # tokenize
+        random.seed(self.args.seed)
+        real_prompt = [f"{details[random.choice([0, 1])]} {r_txt}" for r_txt in real_templates]
+        spoof_prompt = [f"{details[random.choice([0, 1])]} {s_txt}" for s_txt in spoof_templates]
+        
+        spoof_texts = clip.tokenize(spoof_prompt).cuda(self.device, non_blocking=True)  # tokenize
+        real_texts = clip.tokenize(real_prompt).cuda(self.device, non_blocking=True)  # tokenize
 
         # embed with text encoder
         spoof_class_embeddings = self.model.encode_text(spoof_texts)
