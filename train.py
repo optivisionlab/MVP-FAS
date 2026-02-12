@@ -125,7 +125,7 @@ if __name__ == '__main__':
     save_folder = os.path.join(save_folder, model_name + '_' + save_name)
     createDirectory(save_folder)
     createDirectory(directory=os.path.join(save_folder, 'weights'))
-    
+    cfg.LOG.SAVEDF = save_folder
     reference = './reference'
 
     logger_name = f'train_{save_name}.log'

@@ -4,6 +4,7 @@ from loaders.SFW import SFW_Dataset
 from loaders.custom_dataset import FAS_Dataset
 import pandas as pd
 from sklearn.utils import shuffle
+import os
 
 
 def get_MCIO_dataset(cfg,train='CIO',test='M',img_size= (224, 224), normalize=None,):
@@ -47,14 +48,20 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224)):
     train_object = args.key_train.split(",")
     val_object = args.key_val.split(",")
     
+    print("train_object : ", train_object)
+    print("val_object: ", val_object)
+    
     train_full_df = shuffle(full_df[full_df['object'].isin(train_object)], random_state=args.seed)
     val_full_df = shuffle(full_df[full_df['object'].isin(val_object)], random_state=args.seed)
     
-    train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df, base_dir=args.root_dir, 
+    train_full_df.to_csv(os.path.join(cfg.LOG.SAVEDF, "train.csv"), index=False)
+    val_full_df.to_csv(os.path.join(cfg.LOG.SAVEDF, "val.csv"), index=False)
+    
+    train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
                                 transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
                                 is_train=True)
     
-    val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df, base_dir=args.root_dir, 
+    val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
                               transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
                               is_train=False)
     
