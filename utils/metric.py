@@ -127,5 +127,5 @@ class Metric():
         # print("TPR@FPR = ", TPR_FPR_rate)
         ####################
 
-        return acc_valid, cur_EER_valid, cur_HTER_valid, auc_score, threshold, ACC_threshold * 100, TPR_FPR_rate
+        return acc_valid, cur_EER_valid, cur_HTER_valid, auc_score, threshold, ACC_threshold, TPR_FPR_rate
 
