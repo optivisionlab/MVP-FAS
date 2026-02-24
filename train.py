@@ -186,7 +186,7 @@ if __name__ == '__main__':
                                              pin_memory=PIN_MEMORY))
         batch_iterator_len = batch_iterator.__len__()
         val_batch_iterator_len = val_batch_iterator.__len__()
-
+        train_metric = Metric()
         for batch_idx, (img, target) in enumerate(batch_iterator):
             start_time = time.time()
 
@@ -216,6 +216,9 @@ if __name__ == '__main__':
             
             total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(train_Sim_loss_history).mean()
 
+            prob = F.softmax(output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
+            train_acc, train_EER, train_HTER, train_auc, train_threshold, train_ACC_threshold, train_TPR_FPR_rate = train_metric(Is_real.cpu().numpy().tolist(), prob)
+            
             end_time = time.time()
             batch_time = end_time - start_time
 
@@ -230,13 +233,21 @@ if __name__ == '__main__':
                                      this_epoch=epoch, max_epoch=max_epoch)
             eta = eta + val_eta
 
-            line = '[Train] Epoch: {}/{} || Iter: {}/{} || ' \
-                   'Iter: total_loss: {:.4f} ||' \
-                   'Epoch: total_loss: {:.4f} Sim_loss: {:.4f} || ' \
-                   'LR: {:.8f} || Batchtime: {:.4f} s || this_epoch: {}||ETA: {}'.format(
+            line = '[Train] Epoch: {}/{}, Iter: {}/{}, ' \
+                   'Iter: loss: {:.4f} \n' \
+                   'Epoch: total_loss: {:.4f}, Sim_loss: {:.4f}, ' \
+                   'HTER: {:.4f}, EER: {:.4f}, ' \
+                   'AUC: {:.4f}, TPR@FPR: {:.4f}, ACC: {:.4f}, ' \
+                   'ACC_threshold: {:.4f}, threshold: {:.4f} \n' \
+                   'LR: {:.8f} || Batchtime: {:.4f} s || this_epoch: {} || ETA: {}'.format(
                 epoch + 1, max_epoch, batch_idx + 1, batch_iterator_len,
-                loss.item(), total_loss_mean, Similarity_loss_mean * Similarity_alpha, lr, batch_time, 
-                str(datetime.timedelta(seconds=this_epoch_eta)), str(datetime.timedelta(seconds=eta)))
+                loss.item(), total_loss_mean, Similarity_loss_mean * Similarity_alpha, 
+                train_HTER * 100, train_EER * 100, train_auc * 100, 
+                train_TPR_FPR_rate * 100, train_acc * 100, 
+                train_ACC_threshold * 100, train_threshold,
+                lr, batch_time, str(datetime.timedelta(seconds=this_epoch_eta)), 
+                str(datetime.timedelta(seconds=eta))
+            )
             
             if batch_idx % logger_interval == 0:
                 writer.add_scalar("train/total_loss", total_loss_mean, epoch + 1)
@@ -259,19 +270,27 @@ if __name__ == '__main__':
                     # val_Attack_type = val_target['Attack_type']#.cuda(device)
 
                     # forward
-                    val_results = net(val_img)
+                    val_results = net(val_img, val_target)
                     val_output_list = val_results['similarity']
+                    val_patch_alignment_results = results['patch_alignment']
+                    
+                    val_patch_alignment_loss = val_patch_align_CE_loss(val_patch_alignment_results, val_Is_real)
+                    val_sim_loss = val_CE_loss(val_output_list, val_Is_real).cpu().numpy()
 
-                    val_Similarity_loss = val_CE_loss(val_output_list, val_Is_real).cpu().numpy()
-
-                    val_Sim_loss_history.append(val_Similarity_loss)
-                    val_Similarity_loss_mean = np.asarray(val_Sim_loss_history).mean()
+                    val_loss = (val_sim_loss * Similarity_alpha) + (val_patch_alignment_loss * Patch_align_beta)
+                    
+                    val_total_loss_history.append(val_loss.item())
+                    val_Sim_loss_history.append(val_sim_loss.item())
+                    
+                    val_total_loss_mean, val_sim_loss_mean = np.asarray(val_total_loss_history).mean(), np.asarray(val_Sim_loss_history).mean()
 
                     # metric
-                    # spoofing | real
+                    # spoofing ~ is_real = 0 | real ~ is_real = 1
                     #     0       1
                     prob = F.softmax(val_output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
-                    val_acc, val_EER, val_HTER, val_auc, val_threshold, val_ACC_threshold, val_TPR_FPR_rate = val_metric(val_Is_real.cpu().numpy().tolist(),prob)
+                    
+                    # acc_valid, cur_EER_valid, cur_HTER_valid, auc_score, threshold, ACC_threshold * 100, TPR_FPR_rate
+                    val_acc, val_EER, val_HTER, val_auc, val_threshold, val_ACC_threshold, val_TPR_FPR_rate = val_metric(val_Is_real.cpu().numpy().tolist(), prob)
 
                     val_end_time = time.time()
                     val_batch_time = val_end_time - val_start_time
@@ -283,29 +302,37 @@ if __name__ == '__main__':
                                      this_epoch=epoch, max_epoch=max_epoch)
                     val_eta = val_eta + eta
 
-                    val_line = '[VAL] Epoch: {}/{} || iter: {}/{} || ' \
-                               'Iter: total_loss: {:.4f} || ' \
-                               'Epoch: Sim_loss: {:.4f} HTER: {:.4f} AUC: {:.4f} TPR@FPR: {:.4f} top-1: {:.4f} || ' \
-                               'Batchtime: {:.4f} s || this_epoch: {} || ETA: {}'.format(
-                        epoch + 1, max_epoch, val_batch_idx + 1, val_batch_iterator_len,
-                        val_Similarity_loss,
-                        val_Similarity_loss_mean * Similarity_alpha, val_HTER * 100, val_auc*100, val_TPR_FPR_rate, val_acc,
-                        val_batch_time, str(datetime.timedelta(seconds=val_this_epoch_eta)),
-                        str(datetime.timedelta(seconds=val_eta)))
+                    val_line = '[VAL] Epoch: {}/{}, iter: {}/{}, ' \
+                               'Iter: loss: {:.4f} \n' \
+                               'Epoch: total_loss: {:.4f}, Sim_loss: {:.4f}, ' \
+                               'HTER: {:.4f}, EER: {:.4f}, ' \
+                               'AUC: {:.4f}, TPR@FPR: {:.4f}, ACC: {:.4f}, ' \
+                               'ACC_threshold: {:.4f}, threshold: {:.4f} \n' \
+                               'Batchtime: {:.4f} s, this_epoch: {}, ETA: {}' \
+                               .format(
+                                    epoch + 1, max_epoch, val_batch_idx + 1, val_batch_iterator_len, val_loss.item(),
+                                    val_total_loss_mean, val_sim_loss_mean * Similarity_alpha, 
+                                    val_HTER * 100, val_EER * 100, val_auc * 100, 
+                                    val_TPR_FPR_rate, val_acc * 100, val_ACC_threshold * 100, val_threshold,
+                                    val_batch_time, str(datetime.timedelta(seconds=val_this_epoch_eta)),
+                                    str(datetime.timedelta(seconds=val_eta))
+                                )
                     
                     # ------ logs ------ 
-                    writer.add_scalar("val/total_loss", val_Similarity_loss, epoch + 1)
-                    writer.add_scalar("val/Sim_loss", val_Similarity_loss_mean * Similarity_alpha, epoch + 1)
+                    writer.add_scalar("val/total_loss", val_total_loss_mean, epoch + 1)
+                    writer.add_scalar("val/Sim_loss", val_sim_loss_mean * Similarity_alpha, epoch + 1)
                     writer.add_scalar("val/HTER", val_HTER * 100, epoch + 1)
+                    writer.add_scalar("val/EER", val_EER * 100, epoch + 1)
                     writer.add_scalar("val/AUC", val_auc * 100, epoch + 1)
                     writer.add_scalar("val/TPR@FPR", val_TPR_FPR_rate, epoch + 1)
                     writer.add_scalar("val/Acc", val_acc, epoch + 1)
+                    writer.add_scalar("val/val_ACC_threshold", val_acc, epoch + 1)
                     logger.info(val_line)
 
                 # for best NME
                 if (val_HTER) < best_HTER:
                     print('\n')
-                    new_update = f'Congratulation Best HTER is updated, best_HTER: {best_HTER*100} upto val_HTER: {val_HTER*100}'
+                    new_update = f'Congratulation Best HTER is updated, best_HTER: {best_HTER * 100} upto val_HTER: {val_HTER * 100}'
                     logger.info(new_update)
                     best_HTER = val_HTER
                     logger.info('=> saving checkpoint to {}'.format(os.path.join(save_folder, model_name + '_' + save_name + '_best.pt')))
