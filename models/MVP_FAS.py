@@ -14,28 +14,28 @@ spoof_templates = [
     'attack face',
     'fake face',
     'replay attack face',
-    'video replay face',
-    'screen replay face',
+    # 'video replay face',
+    # 'screen replay face',
     'printed photo face',
-    'print attack face',
-    '2D attack face',
+    # 'print attack face',
+    # '2D attack face',
     'silicone face',
     'latex face',
-    '3D mask face',
-    'full mask face',
-    'plastic mask face',
+    # '3D mask face',
+    # 'full mask face',
+    # 'plastic mask face',
     'paper mask face',
-    'transparent mask face',
-    'half mask face',
+    # 'transparent mask face',
+    # 'half mask face',
     'mannequin face',
-    'dummy face',
-    'wax figure face',
-    'doll face',
+    # 'dummy face',
+    # 'wax figure face',
+    # 'doll face',
     'makeup attack face',
-    'heavy makeup face',
-    'makeup obfuscation face',
-    'makeup impersonation face',
-    'partial occlusion face',
+    # 'heavy makeup face',
+    # 'makeup obfuscation face',
+    # 'makeup impersonation face',
+    # 'partial occlusion face',
     'covered mouth face',
     'covered eye face',
     'fake glasses face',
@@ -47,16 +47,16 @@ real_templates = [
     'genuine face',
     'true face',
     'live face',
-    'live human face',
-    'natural face',
-    'authentic face',
-    'actual person face',
-    'valid face',
-    'legitimate face',
-    'normal face',
-    'clear human face',
-    'non-attack face',
-    'bona fide human face',
+    # 'live human face',
+    # 'natural face',
+    # 'authentic face',
+    # 'actual person face',
+    # 'valid face',
+    # 'legitimate face',
+    # 'normal face',
+    # 'clear human face',
+    # 'non-attack face',
+    # 'bona fide human face',
 ]
 
 details = ['a photo of a', 'an image of a']
@@ -139,11 +139,11 @@ class mspt(nn.Module):
                 
         results = {'similarity': None, 'patch_alignment': None}
         random.seed(self.args.seed)
-        real_prompt = [f"{details[random.choice([0, 1])]} {r_txt}" for r_txt in real_templates]
-        spoof_prompt = [f"{details[random.choice([0, 1])]} {s_txt}" for s_txt in spoof_templates]
+        # real_prompt = [f"{details[random.choice([0, 1])]} {r_txt}" for r_txt in real_templates]
+        # spoof_prompt = [f"{details[random.choice([0, 1])]} {s_txt}" for s_txt in spoof_templates]
         
-        spoof_texts = clip.tokenize(spoof_prompt).cuda(self.device, non_blocking=True)  # tokenize
-        real_texts = clip.tokenize(real_prompt).cuda(self.device, non_blocking=True)  # tokenize
+        spoof_texts = clip.tokenize(spoof_templates).cuda(self.device, non_blocking=True)  # tokenize
+        real_texts = clip.tokenize(real_templates).cuda(self.device, non_blocking=True)  # tokenize
 
         # embed with text encoder
         spoof_class_embeddings = self.model.encode_text(spoof_texts)
