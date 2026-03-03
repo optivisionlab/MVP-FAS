@@ -109,7 +109,7 @@ class Metric():
         self.label_list = self.label_list + GT
         self.prob_list = self.prob_list + pred
 
-        acc_valid = ((np.array(self.prob_list)>0.5) == np.array(self.label_list)).sum()/len(self.label_list)
+        acc_valid = ((np.array(self.prob_list) > 0.5) == np.array(self.label_list)).sum()/len(self.label_list)
 
         cur_EER_valid, threshold, _, _ = get_EER_states(np.array(self.prob_list), np.array(self.label_list))
         ACC_threshold = calculate_threshold(np.array(self.prob_list), np.array(self.label_list), threshold)
@@ -127,5 +127,5 @@ class Metric():
         # print("TPR@FPR = ", TPR_FPR_rate)
         ####################
 
-        return acc_valid, cur_EER_valid, cur_HTER_valid, auc_score, threshold, ACC_threshold * 100, TPR_FPR_rate
+        return acc_valid, cur_EER_valid, cur_HTER_valid, auc_score, threshold, ACC_threshold, TPR_FPR_rate
 
