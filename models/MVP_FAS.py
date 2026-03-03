@@ -109,8 +109,7 @@ class mspt(nn.Module):
                 m.requires_grad = False
 
     def align_patches(self, spoof, real, patch, target):
-        real_spoof_txts = [spoof.unsqueeze(0) if rf == 0 else real.unsqueeze(0) for rf
-                           in target['Is_real']]
+        real_spoof_txts = [spoof.unsqueeze(0) if rf == 0 else real.unsqueeze(0) for rf in target['Is_real']]
         real_spoof_txts = torch.concat(real_spoof_txts, dim=0)
         patch_activations = self.patch_alignment(patch, real_spoof_txts)
         broad_patch = patch * patch_activations.unsqueeze(-1)
