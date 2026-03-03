@@ -5,6 +5,42 @@ from loaders.custom_dataset import FAS_Dataset
 import pandas as pd
 from sklearn.utils import shuffle
 import os
+from torchvision import transforms as T
+from PIL import Image
+import numpy as np
+
+
+# may use this for protocol 2
+class RemoveBlackBorders(object):
+
+  def __call__(self, im):
+        # Nếu là numpy → chuyển sang PIL
+        if isinstance(im, np.ndarray):
+            im = Image.fromarray(im)
+
+        if isinstance(im, list):
+            return [self.__call__(img) for img in im]
+
+        V = np.array(im)
+        if len(V.shape) == 3:
+            V = np.mean(V, axis=2)
+
+        X = np.sum(V, axis=0)
+        Y = np.sum(V, axis=1)
+
+        xs = np.nonzero(X)[0]
+        ys = np.nonzero(Y)[0]
+
+        if len(xs) == 0 or len(ys) == 0:
+            return im
+
+        x1, x2 = xs[0], xs[-1]
+        y1, y2 = ys[0], ys[-1]
+
+        return im.crop((x1, y1, x2, y2))
+
+  def __repr__(self):
+    return self.__class__.__name__
 
 
 def get_MCIO_dataset(cfg,train='CIO',test='M',img_size= (224, 224), normalize=None,):
@@ -58,11 +94,21 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224)):
     val_full_df.to_csv(os.path.join(cfg.LOG.SAVEDF, "val.csv"), index=False)
     
     train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
-                                transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                                transform=transforms.Compose([
+                                    RemoveBlackBorders(), 
+                                    transforms.Resize(img_size), 
+                                    transforms.ToTensor(), 
+                                    normalize
+                                ]), 
                                 is_train=True)
     
     val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
-                              transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                              transform=transforms.Compose([
+                                  RemoveBlackBorders(), 
+                                  transforms.Resize(img_size), 
+                                  transforms.ToTensor(), 
+                                  normalize
+                                ]), 
                               is_train=False)
     
     return train_dataset, val_dataset
