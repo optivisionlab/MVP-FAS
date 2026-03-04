@@ -1,0 +1,11 @@
+logs
+runs
+dataset
+losses
+source
+test.py
+train.py
+*.md
+__pycache__
+.git
+.gitignore
