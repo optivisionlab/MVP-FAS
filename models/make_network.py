@@ -1,7 +1,7 @@
 import torch
 
 from models.MVP_FAS import mspt
-def get_network(cfg, args, net_name='MVP_FAS', device='cpu', backbone='ViT-B/16'):
+def get_network(cfg=None, args=None, net_name='MVP_FAS', device='cpu', backbone='ViT-B/16'):
     if net_name == 'MVP_FAS':
         net = mspt(cfg=cfg, args=args, device=device, backbone=backbone)
     # net = torch.nn.DataParallel(net).cuda()

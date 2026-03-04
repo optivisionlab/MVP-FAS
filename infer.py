@@ -14,6 +14,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 import numpy as np
+import cv2
 
 
 def get_eta(batch_time, batch_index, loader_len, this_epoch, max_epoch):
@@ -40,6 +41,29 @@ def createDirectory(directory):
             os.makedirs(directory)
     except OSError:
         print("Error: Failed to create the directory.")
+
+
+def infer_model(net, cfg, device, img):
+    # metric
+    # spoofing ~ is_real = 0 | real ~ is_real = 1
+    #     0       1
+    # labels = ['spoof', 'live']
+    
+    transform = transforms.Compose([
+        RemoveBlackBorders(), 
+        transforms.Resize((cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE)), 
+        transforms.ToTensor(), 
+        transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
+    ])
+    
+    img = transform(img)
+    img = img.unsqueeze(0)
+    img = img.to(device)
+    with torch.no_grad():
+        outputs = net(img)
+    sim = outputs['similarity']
+    prob = F.softmax(sim, dim=-1).cpu().data.numpy()[:, -1].tolist()
+    return prob
 
 
 if __name__ == '__main__':
@@ -79,37 +103,22 @@ if __name__ == '__main__':
     net = get_network(cfg=cfg, args=args, net_name=model_name, device=device, backbone=args.backbone)
     net = load_checkpoint(net, weight_path=args.weights)
     net.to(device)
-    
     logger.info("load checkpoint is done!")
-    # metric
-    # spoofing ~ is_real = 0 | real ~ is_real = 1
-    #     0       1
-    # labels = ['spoof', 'live']
-    
-    transform = transforms.Compose([
-        RemoveBlackBorders(), 
-        transforms.Resize((cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE)), 
-        transforms.ToTensor(), 
-        transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
-    ])
     
     test_df = pd.read_csv(args.test_csv, usecols=['path', 'is_spoof'])
     preds, preds_score = [], []
     targets, targets_score = [], []
     for path, label in test_df.values:
         img = Image.open(os.path.join(args.root_dir, path))
-        img = transform(img)
-        img = img.unsqueeze(0)
-        img = img.to(device)
-        with torch.no_grad():
-            outputs = net(img)
-        sim = outputs['similarity']
-        prob = F.softmax(sim, dim=-1).cpu().data.numpy()[:, -1].tolist()
+        img = img.convert('RGB')
+        # img = cv2.imread(os.path.join(args.root_dir, path))
+        # pil_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+        prob = infer_model(net, cfg, device, img=img)
         logger.info(f"path: {path} - {prob} - {'live' if prob[0] > 0.5 else 'spoof'}")
         preds_score.append(prob[0])
         targets_score.append(int(not label))
         preds.append('live' if prob[0] > 0.5 else 'spoof')
-        targets.append('spoof'if label else 'live')
+        targets.append('spoof' if label else 'live')
     
     cm = confusion_matrix(targets, preds, labels=['spoof', 'live'])
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['spoof', 'live'])
@@ -119,7 +128,8 @@ if __name__ == '__main__':
     disp.figure_.savefig(os.path.join(save_folder, 'confusion_matrix_plot.png'), dpi=300, bbox_inches='tight')
     plt.show()
     
-    logger.info(classification_report(targets, preds, target_names=['spoof', 'live']))
+    if len(np.unique(targets)) == 2:
+        logger.info(classification_report(targets, preds, target_names=['spoof', 'live']))
     
     EER_score, threshold, _, _ = get_EER_states(np.array(preds_score), np.array(targets_score))
     HTER_score = get_HTER_at_thr(np.array(preds_score), np.array(targets_score), threshold)

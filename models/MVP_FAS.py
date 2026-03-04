@@ -63,7 +63,7 @@ details = ['a photo of a', 'an image of a']
 
 class mspt(nn.Module):
 
-    def __init__(self, cfg, args, device='cpu', backbone="ViT-B/16"):
+    def __init__(self, cfg=None, args=None, device='cpu', backbone="ViT-B/16"):
         super(mspt, self).__init__()
         self.cfg = cfg
         self.args = args
@@ -137,7 +137,7 @@ class mspt(nn.Module):
     def forward(self, input, target=None):
                 
         results = {'similarity': None, 'patch_alignment': None}
-        random.seed(self.args.seed)
+        random.seed(self.cfg.MODEL.SEED)
         # real_prompt = [f"{details[random.choice([0, 1])]} {r_txt}" for r_txt in real_templates]
         # spoof_prompt = [f"{details[random.choice([0, 1])]} {s_txt}" for s_txt in spoof_templates]
         

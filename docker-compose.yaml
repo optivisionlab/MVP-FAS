@@ -1,0 +1,25 @@
+version: '3'
+services:
+  vft-fas:
+    image: vft-fas-v1:latest
+    volumes:
+      - ./runs:/app/sources/runs
+      - ./logs:/app/sources/logs
+    logging:
+      driver: local
+      options:
+        max-size: 50m
+        max-file: "3"
+    environment:
+      - BACKBONE=ViT-B/16
+      - WEIGHT=runs/clip/train_28/MVP_FAS_ViT-B-16/weights/MVP_FAS_ViT-B-16_best_ckpt.pt
+      - DEVICE=0
+      - HOST=0.0.0.0
+      - PORT=2202
+      - IMG_MODE=.jpg,.png,.JPEG,.jpeg,.jfif
+      - IPHONE_MODE=.heic
+    ports:
+      - "2202:2202"
+    expose:
+      - '2202'
+    command: ["python", "app.py"]

@@ -48,3 +48,10 @@ wcwidth==0.2.14
 wheel==0.45.1
 win_inet_pton==1.1.0
 yacs==0.1.8
+
+# app
+httpx==0.27.2
+aiofiles==24.1.0
+fastapi==0.111.1
+pyheif==0.8.0
+pandas==2.0.3
