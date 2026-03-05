@@ -90,11 +90,6 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', type=int, default="number of epochs")
 
     args = parser.parse_args()
-    
-    # --- Device ---
-    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
-    
-    print("device : ", device)
 
     now_time = datetime.datetime.now()
 
@@ -126,10 +121,13 @@ if __name__ == '__main__':
     createDirectory(save_folder)
     createDirectory(directory=os.path.join(save_folder, 'weights'))
     cfg.LOG.SAVEDF = save_folder
-    reference = './reference'
-
     logger_name = f'train_{save_name}.log'
     logger = create_logger(os.path.join(save_folder, logger_name))
+    
+    # --- Device ---
+    device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
+    logger.info(f"device : {device}")
+    logger.info(f"logs args: {args}")
     
     # --- TensorBoard ---
     writer = SummaryWriter(log_dir=os.path.join(save_folder, "tensorboard-logs"))
@@ -157,7 +155,7 @@ if __name__ == '__main__':
     Similarity_alpha = cfg.TRAIN.SIMILARITY_ALPHA
     Patch_align_beta = cfg.TRAIN.PATCH_ALIGN_BETA
     # get dataset
-    train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING)
+    train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING, logger=logger)
     net = get_network(cfg=cfg, args=args, net_name=model_name, device=device, backbone=args.backbone)
     net.to(device)
     
@@ -168,7 +166,7 @@ if __name__ == '__main__':
     elif cfg.TRAIN.OPTIMIZER == 'sgd':
         optimizer = optim.SGD(net.parameters(), lr=cfg.TRAIN.LR, momentum=0.9, weight_decay=cfg.TRAIN.WEIGHT_DECAY)
 
-    if resume == True: net, optimizer, last_epoch = set_pretrained_setting(net, optimizer, os.path.join(reference, checkpoint))
+    if resume == True: net, optimizer, last_epoch = set_pretrained_setting(net, optimizer, checkpoint)
     scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, cfg.TRAIN.LR_STEP, cfg.TRAIN.LR_FACTOR, last_epoch=last_epoch)
     CE_loss, val_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
     patch_align_CE_loss, val_patch_align_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
