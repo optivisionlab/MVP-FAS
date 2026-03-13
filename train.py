@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from configs.cfg import _C as cfg
 from loaders.make_dataset import get_Dataset
-from models.make_network import get_network, set_pretrained_setting
+from models.make_network import get_network, set_pretrained_setting, load_checkpoint
 from losses.make_losses import get_loss_fucntion
 from utils.metric import Metric
 from torch.nn import functional as F
@@ -70,9 +70,9 @@ if __name__ == '__main__':
     parser.add_argument("--backbone", type=str, default="RN50", help="choose subname of model")
     parser.add_argument("--batch_size", type=int, default=16, help="batch size for training")
     parser.add_argument("--seed", type=int, default=42, help="random seed for training")
-    parser.add_argument("--resume", type=bool, default=False, help='resume')
+    parser.add_argument("--resume", action='store_true', help='resume')
     parser.add_argument("--periodically", type=bool, default=False, help='save periodically')
-    parser.add_argument("--checkpoint", type=str, default='best_model.pt', help='for resume')
+    parser.add_argument("--checkpoint", type=str, default='best_model.pt', help='for resume/pretrained')
     parser.add_argument("--setting", type=str, default='fas', help='DATASET SETTING [MCIO, SFW, FAS, ALL]')
     parser.add_argument("--train_dataset", type=str, default='FW', help='TRAIN_DATASET')
     parser.add_argument("--test_dataset", type=str, default='S', help='TEST_DATASET')
@@ -86,6 +86,7 @@ if __name__ == '__main__':
     parser.add_argument('--gpu_id', type=str, default=0)
     parser.add_argument('--save_path', type=str, default="runs/save_model")
     parser.add_argument('--num_epochs', type=int, default="number of epochs")
+    parser.add_argument("--pretrained", action='store_true', help='pretrained')
 
     args = parser.parse_args()
 
@@ -155,6 +156,11 @@ if __name__ == '__main__':
     # get dataset
     train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING, logger=logger)
     net = get_network(cfg=cfg, args=args, net_name=model_name, device=device, backbone=args.backbone)
+    
+    if args.pretrained:
+        logger.info("load pretrained {}".format(checkpoint))
+        net = load_checkpoint(net, checkpoint)
+    
     net.to(device)
     
     if cfg.TRAIN.OPTIMIZER == "adam":
@@ -243,7 +249,7 @@ if __name__ == '__main__':
         line = '\n[Train] Epoch [{}/{}]: total_loss: {:.4f}, Sim_loss: {:.4f}\n' \
                 'HTER: {:.4f}, EER: {:.4f}, \n' \
                 'AUC: {:.4f}, TPR@FPR: {:.4f}, ACC: {:.4f}, \n' \
-                'ACC_threshold: {:.4f}, threshold: {:.4f} LR: {:.8f}'.format(
+                'ACC_threshold: {:.4f}, threshold: {:.4f} LR: {:.8f} \n'.format(
                 epoch + 1, max_epoch, total_loss_mean, Similarity_loss_mean * Similarity_alpha, 
                 np.asarray(train_HTER_history).mean() * 100, np.asarray(train_EER_history).mean() * 100, 
                 np.asarray(train_auc_history).mean() * 100, np.asarray(train_TPR_FPR_rate_history).mean() * 100, np.asarray(train_acc_history).mean() * 100, 
