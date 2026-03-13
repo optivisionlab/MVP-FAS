@@ -8,12 +8,13 @@ def get_network(cfg=None, args=None, net_name='MVP_FAS', device='cpu', backbone=
     return net
 
 def set_pretrained_setting(net, optimizer, weight_path):
-    checkpoint_dict = torch.load(weight_path)
+    checkpoint_dict = torch.load(weight_path, weights_only=False)
     checkpoint = checkpoint_dict['state_dict']
     optim_checkpoint = checkpoint_dict['optimizer']
     last_epoch = checkpoint_dict['epoch'] - 1
-    pretrained_dict = {k: v for k, v in checkpoint.items() if k in net.module.state_dict().keys()}
-    net.module.load_state_dict(pretrained_dict)
+    # pretrained_dict = {k: v for k, v in checkpoint.items() if k in net.module.state_dict().keys()}
+    # net.module.load_state_dict(pretrained_dict)
+    net.load_state_dict(checkpoint)
     optimizer.load_state_dict(optim_checkpoint)
     return net, optimizer, last_epoch
 
