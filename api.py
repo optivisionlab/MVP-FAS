@@ -97,14 +97,15 @@ async def api_vft_ekyb(request: Request, files: List[UploadFile] = File(None), u
             for url in urls:
                 file_path, _ = await download_file_from_urls3(url=url, save_path=tmpdirname, uid=uid, timeout=15)
                 path_files.append(file_path)
-            images, files_name = load_from_local(files_path=path_files, logger=logger, uid=uid)
-            pil_image = Image.fromarray(img)
-            prob = infer_model(net, cfg, device, img=pil_image)
-            results[file_name] = {
-                'prob': prob[0],
-                'label': 'live' if prob[0] > 0.5 else 'spoof',
-                'is_spoof': False if prob[0] > 0.5 else True,
-            }
+            images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
+            for img, file_name in zip(images, files_name):
+                pil_image = Image.fromarray(img)
+                prob = infer_model(net, cfg, device, img=pil_image)
+                results[file_name] = {
+                    'prob': prob[0],
+                    'label': 'live' if prob[0] > 0.5 else 'spoof',
+                    'is_spoof': False if prob[0] > 0.5 else True,
+                }
             
     else:
         data['message'] = 'HTTP 400 BAD REQUEST'

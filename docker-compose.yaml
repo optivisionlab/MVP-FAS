@@ -1,7 +1,7 @@
 version: '3'
 services:
   vft-fas:
-    image: vft-fas-v1:latest
+    image: vft-fas-v1.1:latest
     volumes:
       - ./runs:/app/sources/runs
       - ./logs:/app/sources/logs
