@@ -12,6 +12,7 @@ from utils.logging import get_logger
 from utils.utils import load_form_data, load_from_local, download_file_from_urls3
 from PIL import Image
 import tempfile
+import datetime, time
 
 
 logger = get_logger()
@@ -34,6 +35,17 @@ def check_input(uid, files, urls, data):
         logger.error("ID {} >>> ERROR inference: Message Error: {}, exc_type: {}, exc_obj: {}, exc_tb: {}, tb_info: {}".
                     format(uid, str(e), exc_type, exc_obj, exc_tb, tb_info))
     return invalid_files, invalid_urls
+
+
+def infer_api(net, cfg, device, file_name, img, threshold=0.5):
+    pil_image = Image.fromarray(img)
+    prob = infer_model(net, cfg, device, img=pil_image)
+    return {
+        'source': file_name,
+        'prob': "{:.4f}".format((1 - prob[0]) * 100),
+        'label': 'live' if prob[0] > threshold else 'spoof',
+        'is_spoof': False if prob[0] > threshold else True,
+    }
 
 
 # --- Device ---
@@ -59,37 +71,39 @@ def ping():
 
 
 @router.post("/vft-fas") # Giấy tờ ĐKKD
-async def api_vft_ekyb(request: Request, files: List[UploadFile] = File(None), urls: list[str] = Form(None)):
+async def api_vft_ekyb(request: Request, files: List[UploadFile] = File(None), urls: list[str] = Form(None), threshold: float = Form(0.5)):
     
-    uid, results = uuid.uuid1(), {}
+    uid, results = uuid.uuid1(), []
     data = {
         "uuid": str(uid),
-        "results": None,
-        "status": 200,
-        "message": "thành công",
+        "status_code": 200,
+        "detail": "success",
+        "spoof": False,
+        "spoofs": [],
+        "start_time": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "latency_ms": 0.0,
+        
     }
     partner = request.headers.get("X-partner", "VFT-Unknown")
     source = request.headers.get("source", "VFT-Unknown")
     xgw_id = request.headers.get("Xgw-Request-Id", str(uid))
     
     logger.info(
-        "ID: {} input data: files={}, url={}, partner={}, source={}, xgw_id={}".format(
-            uid, files, urls, partner, source, xgw_id
+        "ID: {} input data: files={}, url={}, partner={}, source={}, xgw_id={}, threshold: {}, type_threshold: {}".format(
+            uid, files, urls, partner, source, xgw_id, threshold, type(threshold)
         )
     )
 
+    st_time = time.time()
     invalid_files, invalid_urls = check_input(uid, files, urls, data)
     
     if not invalid_files: # from file
         images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
         for img, file_name in zip(images, files_name):
-            pil_image = Image.fromarray(img)
-            prob = infer_model(net, cfg, device, img=pil_image)
-            results[file_name] = {
-                'prob': prob[0],
-                'label': 'live' if prob[0] > 0.5 else 'spoof',
-                'is_spoof': False if prob[0] > 0.5 else True,
-            }
+            output = infer_api(net, cfg, device, file_name=file_name, img=img, threshold=threshold)
+            if output['is_spoof']:
+                data['spoof'] = True
+            results.append(output)
 
     elif not invalid_urls: # from url
         path_files = []
@@ -99,16 +113,15 @@ async def api_vft_ekyb(request: Request, files: List[UploadFile] = File(None), u
                 path_files.append(file_path)
             images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
             for img, file_name in zip(images, files_name):
-                pil_image = Image.fromarray(img)
-                prob = infer_model(net, cfg, device, img=pil_image)
-                results[file_name] = {
-                    'prob': prob[0],
-                    'label': 'live' if prob[0] > 0.5 else 'spoof',
-                    'is_spoof': False if prob[0] > 0.5 else True,
-                }
+                output = infer_api(net, cfg, device, file_name=file_name, img=img, threshold=threshold)
+                if output['is_spoof']:
+                    data['spoof'] = True
+                results.append(output)
             
     else:
-        data['message'] = 'HTTP 400 BAD REQUEST'
+        data['detail'] = 'HTTP 400 BAD REQUEST'
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=data)
-    data['results'] = results
+    ed_time = time.time()
+    data['spoofs'] = results
+    data['latency_ms'] = ed_time - st_time
     return JSONResponse(content=data, status_code=status.HTTP_200_OK)
