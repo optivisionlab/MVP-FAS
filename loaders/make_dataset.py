@@ -79,13 +79,13 @@ def get_FAS_dataset(args, cfg, normalize=None, img_size=(224, 224)):
     return train_dataset, val_dataset
 
 
-def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224)):
+def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None):
     full_df = pd.read_csv(args.full_dataset_csv)
     train_object = args.key_train.split(",")
     val_object = args.key_val.split(",")
     
-    print("train_object : ", train_object)
-    print("val_object: ", val_object)
+    logger.info(f"train_object : {train_object}")
+    logger.info(f"val_object: {val_object}")
     
     train_full_df = shuffle(full_df[full_df['object'].isin(train_object)], random_state=args.seed)
     val_full_df = shuffle(full_df[full_df['object'].isin(val_object)], random_state=args.seed)
@@ -114,7 +114,7 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224)):
     return train_dataset, val_dataset
 
 
-def get_Dataset(args, cfg, SETTING="MCIO"):
+def get_Dataset(args, cfg, SETTING="MCIO", logger=None):
     normalize = transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
     
     if SETTING.upper() == "MCIO":
@@ -129,7 +129,7 @@ def get_Dataset(args, cfg, SETTING="MCIO"):
         train_dataset, val_dataset = get_FAS_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE))
 
     elif SETTING.upper() == 'ALL':
-        train_dataset, val_dataset = get_ALL_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE))
+        train_dataset, val_dataset = get_ALL_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE), logger=logger)
 
     return train_dataset, val_dataset
 
