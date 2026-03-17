@@ -42,7 +42,7 @@ def infer_api(net, cfg, device, file_name, img, threshold=0.5):
     prob = infer_model(net, cfg, device, img=pil_image)
     return {
         'source': file_name,
-        'prob': 1 - prob[0],
+        'prob': "{:.4f}".format((1 - prob[0]) * 100),
         'label': 'live' if prob[0] > threshold else 'spoof',
         'is_spoof': False if prob[0] > threshold else True,
     }
