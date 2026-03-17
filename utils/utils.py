@@ -70,7 +70,13 @@ async def download_file_from_urls3(url, save_path, uid, timeout=5):
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.get(url, headers=headers)
             response.raise_for_status()  # Raise exception for 4xx, 5xx
- 
+
+            if not pathlib.Path(file_name).suffix:
+                content_type = response.headers.get("content-type", "")
+                ext = content_type.split("/")[-1]
+                file_name = f"{file_name}.{ext}"
+                file_path = os.path.join(save_path, file_name)
+
             async with aiofiles.open(file_path, 'wb') as out_file:
                 await out_file.write(response.content)
  
