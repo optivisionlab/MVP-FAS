@@ -62,6 +62,7 @@ def infer_model(net, cfg, device, img):
     with torch.no_grad():
         outputs = net(img)
     sim = outputs['similarity']
+    # print("sim : ", sim)
     prob = F.softmax(sim, dim=-1).cpu().data.numpy()[:, -1].tolist()
     return prob
 
@@ -94,13 +95,14 @@ if __name__ == '__main__':
     createDirectory(save_folder)
     logger = create_logger(os.path.join(save_folder, logger_name))
     logger.info(f">>>>>>>>>>>>> Save Infer to : {save_folder} <<<<<<<<<<<<<<<<<<<")
-    
+    logger.info(f"args : {args}")
     # --- Device ---
     device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     logger.info(f"device : {device}")
     
     # --- setup -----
     net = get_network(cfg=cfg, args=args, net_name=model_name, device=device, backbone=args.backbone)
+    logger.info(f"load checkpoint: {args.weights}")
     net = load_checkpoint(net, weight_path=args.weights)
     net.to(device)
     logger.info("load checkpoint is done!")
@@ -109,19 +111,25 @@ if __name__ == '__main__':
     preds, preds_score = [], []
     targets, targets_score = [], []
     for path, label in test_df.values:
-        img = Image.open(os.path.join(args.root_dir, path))
-        img = img.convert('RGB')
-        # img = cv2.imread(os.path.join(args.root_dir, path))
-        # pil_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
-        prob = infer_model(net, cfg, device, img=img)
-        logger.info(f"path: {path} - {prob} - {'live' if prob[0] > 0.5 else 'spoof'}")
-        preds_score.append(prob[0])
-        targets_score.append(int(not label))
-        preds.append('live' if prob[0] > 0.5 else 'spoof')
-        targets.append('spoof' if label else 'live')
+        try:
+            img = Image.open(os.path.join(args.root_dir, path))
+            img = img.convert('RGB')
+            # img_resize = img.resize((224, 224))
+            # img_resize.save("runs/results/input.png")
+            # img = cv2.imread(os.path.join(args.root_dir, path))
+            # pil_image = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+            prob = infer_model(net, cfg, device, img=img)
+            logger.info(f"path: {path} - {prob} - {'live' if prob[0] > 0.5 else 'spoof'}")
+            preds_score.append(prob[0])
+            targets_score.append(int(not label))
+            preds.append('live' if prob[0] > 0.5 else 'spoof')
+            targets.append('spoof' if label else 'live')
+        except Exception as e:
+            logger.info(f"ERROR: {e} -- PATH : {path} --- LABEL: {label}")
     
-    cm = confusion_matrix(targets, preds, labels=['spoof', 'live'])
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['spoof', 'live'])
+    cm = confusion_matrix(targets, preds, labels=['live', 'spoof'])
+    logger.info(f"confusion matrix: {cm}")
+    disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=['live', 'spoof'])
     fig, ax = plt.subplots(figsize=(8, 6)) # Optional: set figure size
     disp.plot(ax=ax) # Pass the ax object to the plot method
     plt.title("Confusion Matrix Live/Spoof") # Optional: add a title
@@ -129,10 +137,12 @@ if __name__ == '__main__':
     plt.show()
     
     if len(np.unique(targets)) == 2:
-        logger.info(classification_report(targets, preds, target_names=['spoof', 'live']))
+        logger.info(classification_report(targets, preds, target_names=['live', 'spoof']))
     
     EER_score, threshold, _, _ = get_EER_states(np.array(preds_score), np.array(targets_score))
     HTER_score = get_HTER_at_thr(np.array(preds_score), np.array(targets_score), threshold)
 
     logger.info(f"EER_score: {EER_score}, HTER_score: {HTER_score}, threshold: {threshold}")
+    logger.info(f"checkpoint: {args.weights}")
+    logger.info(f">>>>>>>>>>>>> Save Infer to : {save_folder} <<<<<<<<<<<<<<<<<<<")
     
