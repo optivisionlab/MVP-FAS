@@ -63,7 +63,7 @@ class SlotAttention_PQTK(nn.Module):
             attn = attn / attn.sum(dim=-1, keepdim=True)
 
             # visualization code##
-            # visualize_attn(attn, attn_shape=(b, int(math.sqrt(n)),int(math.sqrt(n)), 6),iter=_)
+            # visualize_attn(attn, attn_shape=(b, int(math.sqrt(n)),int(math.sqrt(n)), -1), iter=_)
             ######################
 
             # attention_score.matmul(v)
