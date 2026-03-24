@@ -94,38 +94,31 @@ def accuracy(output, target, topk=(1,)):
 
 class Metric():
     def __init__(self):
-        self.Acc_list = []
-        self.label_list = []
-        self.prob_list = []
-    def __call__(self, GT, pred):
+        self.labels = []
+        self.probs = []
 
-        auc_score = -1
-        TPR_FPR_rate = -1
+    def update(self, GT, pred):
+        self.labels.append(GT)
+        self.probs.append(pred)
 
-        #################### Metric
-        # spoofing | real
-        #     0       1
-        # prob = F.softmax(output_list, dim=-1).cpu().data.numpy()[:, -1]
-        self.label_list = self.label_list + GT
-        self.prob_list = self.prob_list + pred
+    def compute(self):
+        labels = np.concatenate(self.labels)
+        probs = np.concatenate(self.probs)
 
-        acc_valid = ((np.array(self.prob_list) > 0.5) == np.array(self.label_list)).sum()/len(self.label_list)
+        acc = ((probs > 0.5) == labels).mean()
 
-        cur_EER_valid, threshold, _, _ = get_EER_states(np.array(self.prob_list), np.array(self.label_list))
-        ACC_threshold = calculate_threshold(np.array(self.prob_list), np.array(self.label_list), threshold)
-        cur_HTER_valid = get_HTER_at_thr(np.array(self.prob_list), np.array(self.label_list), threshold)
+        eer, threshold, _, _ = get_EER_states(probs, labels)
+        hter = get_HTER_at_thr(probs, labels, threshold)
+        acc_thr = calculate_threshold(probs, labels, threshold)
 
-        if len(np.unique(self.label_list)) > 1:
-            auc_score = roc_auc_score(self.label_list, self.prob_list)
-            # print(auc_score)
-            fpr, tpr, thr = roc_curve(np.array(self.label_list), np.array(self.prob_list))
-            tpr_filtered = tpr[fpr <= (1 / 100)]
-            if len(tpr_filtered) == 0:
-              TPR_FPR_rate = 0
-            else:
-              TPR_FPR_rate = tpr_filtered[-1]
-        # print("TPR@FPR = ", TPR_FPR_rate)
-        ####################
+        auc = -1
+        tpr_fpr = -1
 
-        return acc_valid, cur_EER_valid, cur_HTER_valid, auc_score, threshold, ACC_threshold, TPR_FPR_rate
+        if len(np.unique(labels)) > 1:
+            auc = roc_auc_score(labels, probs)
+            fpr, tpr, _ = roc_curve(labels, probs)
+            tpr_filtered = tpr[fpr <= 0.01]
+            tpr_fpr = tpr_filtered[-1] if len(tpr_filtered) > 0 else 0
+
+        return acc, eer, hter, auc, threshold, acc_thr, tpr_fpr
 

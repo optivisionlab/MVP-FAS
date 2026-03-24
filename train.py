@@ -39,14 +39,6 @@ def create_logger(filename='train_log.log'):
     return logger
 
 
-def get_eta(batch_time, batch_index, loader_len, this_epoch, max_epoch):
-    # this epoch start 0
-    this_epoch_eta = int(batch_time * (loader_len - (batch_index + 1)))
-    left_epoch_eta = int(((max_epoch - (this_epoch + 1)) * batch_time * loader_len))
-    eta = this_epoch_eta + left_epoch_eta
-    return eta, this_epoch_eta
-
-
 def createDirectory(directory):
     try:
         if not os.path.exists(directory):
@@ -175,28 +167,26 @@ if __name__ == '__main__':
     CE_loss, val_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
     patch_align_CE_loss, val_patch_align_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
 
-    val_batch_time = None
-    batch_time = 0 #None
-
     net.train()
     for epoch in range(start_epoch, max_epoch):
         train_total_loss_history, train_Sim_loss_history = [], []
-        train_acc_history, train_EER_history, train_HTER_history = [], [], []
-        train_auc_history, train_threshold_history, train_ACC_threshold_history = [], [], []
-        train_TPR_FPR_rate_history = []
 
-        train_loader = DataLoader(train_Dataset, batch_size, shuffle=True, num_workers=cfg.TRAIN.NUM_WORKERS,
-                                         pin_memory=PIN_MEMORY)
-        val_loader = DataLoader(val_Dataset, batch_size, shuffle=False, num_workers=cfg.TRAIN.NUM_WORKERS,
-                                             pin_memory=PIN_MEMORY)
+        train_loader = DataLoader(train_Dataset, batch_size, shuffle=True, 
+                                  num_workers=cfg.TRAIN.NUM_WORKERS, 
+                                  pin_memory=PIN_MEMORY)
+        
+        val_loader = DataLoader(val_Dataset, batch_size, shuffle=False, 
+                                num_workers=cfg.TRAIN.NUM_WORKERS, 
+                                pin_memory=PIN_MEMORY)
+        
         batch_iterator_len = len(train_loader)
         val_batch_iterator_len = len(val_loader)
         train_metric = Metric()
+        
         for batch_idx, (img, target) in enumerate(tqdm(train_loader, desc=f"[Epoch {epoch + 1}] Train: ")):
             # start_time = time.time()
 
             img = img.cuda(device)
-
             Is_real = target['Is_real'].cuda(device)
             # Domain = target['Domain']#.cuda(device)
             # Attack_type = target['Attack_type']#.cuda(device)
@@ -221,47 +211,40 @@ if __name__ == '__main__':
             
             total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(train_Sim_loss_history).mean()
 
-            prob = F.softmax(output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
-            train_acc, train_EER, train_HTER, train_auc, train_threshold, train_ACC_threshold, train_TPR_FPR_rate = train_metric(Is_real.cpu().numpy().tolist(), prob)
+            # prob = F.softmax(output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
+            prob = F.softmax(output_list.detach(), dim=-1)[:, -1].cpu().numpy()
+            labels = Is_real.detach().cpu().numpy()
+
+            # accumulate
+            train_metric.update(labels, prob)
             
-            train_acc_history.append(train_acc)
-            train_EER_history.append(train_EER)
-            train_HTER_history.append(train_HTER)
-            train_auc_history.append(train_auc)
-            train_threshold_history.append(train_threshold)
-            train_ACC_threshold_history.append(train_ACC_threshold)
-            train_TPR_FPR_rate_history.append(train_TPR_FPR_rate)
-            
-            
+        train_acc, train_EER, train_HTER, train_auc, train_threshold, train_ACC_threshold, train_TPR_FPR_rate = train_metric.compute()
         # -------------- logs train ------------
         total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(train_Sim_loss_history).mean()
         writer.add_scalar("train/total_loss", total_loss_mean, epoch + 1)
         writer.add_scalar("train/Sim_loss", Similarity_loss_mean * Similarity_alpha, epoch + 1)
         writer.add_scalar("train/LR", lr, epoch + 1)
-        writer.add_scalar("train/train_acc", np.asarray(train_acc_history).mean(), epoch + 1)
-        writer.add_scalar("train/train_EER", np.asarray(train_EER_history).mean(), epoch + 1)
-        writer.add_scalar("train/train_HTER", np.asarray(train_HTER_history).mean(), epoch + 1)
-        writer.add_scalar("train/train_auc", np.asarray(train_auc_history).mean(), epoch + 1)
-        writer.add_scalar("train/train_threshold", np.asarray(train_threshold_history).mean(), epoch + 1)
-        writer.add_scalar("train/train_ACC_threshold", np.asarray(train_ACC_threshold_history).mean(), epoch + 1)
-        writer.add_scalar("train/train_TPR_FPR_rate", np.asarray(train_TPR_FPR_rate_history).mean(), epoch + 1)
+        writer.add_scalar("train/train_acc", train_acc, epoch + 1)
+        writer.add_scalar("train/train_EER", train_EER, epoch + 1)
+        writer.add_scalar("train/train_HTER", train_HTER, epoch + 1)
+        writer.add_scalar("train/train_auc", train_auc, epoch + 1)
+        writer.add_scalar("train/train_threshold", train_threshold, epoch + 1)
+        writer.add_scalar("train/train_ACC_threshold", train_ACC_threshold, epoch + 1)
+        writer.add_scalar("train/train_TPR_FPR_rate", train_TPR_FPR_rate, epoch + 1)
         
         line = '\n[Train] Epoch [{}/{}]: total_loss: {:.4f}, Sim_loss: {:.4f}\n' \
                 'HTER: {:.4f}, EER: {:.4f}, \n' \
                 'AUC: {:.4f}, TPR@FPR: {:.4f}, ACC: {:.4f}, \n' \
                 'ACC_threshold: {:.4f}, threshold: {:.4f} LR: {:.8f} \n'.format(
                 epoch + 1, max_epoch, total_loss_mean, Similarity_loss_mean * Similarity_alpha, 
-                np.asarray(train_HTER_history).mean() * 100, np.asarray(train_EER_history).mean() * 100, 
-                np.asarray(train_auc_history).mean() * 100, np.asarray(train_TPR_FPR_rate_history).mean() * 100, np.asarray(train_acc_history).mean() * 100, 
-                np.asarray(train_ACC_threshold_history).mean() * 100, np.asarray(train_threshold_history).mean(), lr)
+                train_HTER * 100, train_EER * 100, 
+                train_auc * 100, train_TPR_FPR_rate * 100, train_acc * 100, 
+                train_ACC_threshold * 100, train_threshold, lr)
         logger.info(line)
         
         if validation == True:
             net.eval()
             val_total_loss_history, val_Sim_loss_history = [], []
-            val_acc_history, val_EER_history, val_HTER_history = [], [], []
-            val_auc_history, val_threshold_history, val_ACC_threshold_history = [], [], []
-            val_TPR_FPR_rate_history = []
             with torch.no_grad():
                 val_metric = Metric()
                 for val_batch_idx, (val_img, val_target) in enumerate(tqdm(val_loader, desc=f"[Epoch {epoch + 1}] Val: ")):
@@ -290,47 +273,42 @@ if __name__ == '__main__':
                     # metric
                     # spoofing ~ is_real = 0 | real ~ is_real = 1
                     #     0       1
-                    prob = F.softmax(val_output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
+                    # prob = F.softmax(val_output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
+                    prob = F.softmax(val_output_list.detach(), dim=-1)[:, -1].cpu().numpy()
+                    labels = val_Is_real.detach().cpu().numpy()
                     
-                    # acc_valid, cur_EER_valid, cur_HTER_valid, auc_score, threshold, ACC_threshold * 100, TPR_FPR_rate
-                    val_acc, val_EER, val_HTER, val_auc, val_threshold, val_ACC_threshold, val_TPR_FPR_rate = val_metric(val_Is_real.cpu().numpy().tolist(), prob)
-
-                    val_acc_history.append(val_acc) 
-                    val_EER_history.append(val_EER)
-                    val_HTER_history.append(val_HTER)
-                    val_auc_history.append(val_auc)
-                    val_threshold_history.append(val_threshold)
-                    val_ACC_threshold_history.append(val_ACC_threshold)
-                    val_TPR_FPR_rate_history.append(val_TPR_FPR_rate)
-                    
+                    # accumulate
+                    val_metric.update(labels, prob)
+                
+                val_acc, val_EER, val_HTER, val_auc, val_threshold, val_ACC_threshold, val_TPR_FPR_rate = val_metric.compute()
                 # ------ logs ------ 
                 val_total_loss_mean, val_sim_loss_mean = np.asarray(val_total_loss_history).mean(), np.asarray(val_Sim_loss_history).mean()
                 writer.add_scalar("val/total_loss", val_total_loss_mean, epoch + 1)
                 writer.add_scalar("val/Sim_loss", val_sim_loss_mean * Similarity_alpha, epoch + 1)
-                writer.add_scalar("val/HTER", np.asarray(val_HTER_history).mean() * 100, epoch + 1)
-                writer.add_scalar("val/EER", np.asarray(val_EER_history).mean() * 100, epoch + 1)
-                writer.add_scalar("val/AUC", np.asarray(val_auc_history).mean() * 100, epoch + 1)
-                writer.add_scalar("val/TPR@FPR", np.asarray(val_TPR_FPR_rate_history).mean() * 100, epoch + 1)
-                writer.add_scalar("val/Acc", np.asarray(val_acc_history).mean() * 100, epoch + 1)
-                writer.add_scalar("val/val_ACC_threshold", np.asarray(val_ACC_threshold_history).mean() * 100, epoch + 1)
-                writer.add_scalar("val/val_threshold_history", np.asarray(val_threshold_history).mean(), epoch + 1)
+                writer.add_scalar("val/HTER", val_HTER * 100, epoch + 1)
+                writer.add_scalar("val/EER", val_EER * 100, epoch + 1)
+                writer.add_scalar("val/AUC", val_auc * 100, epoch + 1)
+                writer.add_scalar("val/TPR@FPR", val_TPR_FPR_rate * 100, epoch + 1)
+                writer.add_scalar("val/Acc", val_acc * 100, epoch + 1)
+                writer.add_scalar("val/val_ACC_threshold", val_ACC_threshold * 100, epoch + 1)
+                writer.add_scalar("val/val_threshold_history", val_threshold, epoch + 1)
 
                 line = '\n[VAL] Epoch [{}/{}]: total_loss: {:.4f}, Sim_loss: {:.4f} \n' \
                         'HTER: {:.4f}, EER: {:.4f} \n' \
                         'AUC: {:.4f}, TPR@FPR: {:.4f}, ACC: {:.4f} \n' \
                         'ACC_threshold: {:.4f}, threshold: {:.4f} LR: {:.8f}'.format(
                 epoch + 1, max_epoch, val_total_loss_mean, val_sim_loss_mean * Similarity_alpha, 
-                np.asarray(val_HTER_history).mean() * 100, np.asarray(val_EER_history).mean() * 100, 
-                np.asarray(val_auc_history).mean() * 100, np.asarray(val_TPR_FPR_rate_history).mean() * 100, np.asarray(val_acc_history).mean() * 100, 
-                np.asarray(val_ACC_threshold_history).mean() * 100, np.asarray(val_threshold_history).mean(), lr)
+                val_HTER * 100, val_EER * 100, 
+                val_auc * 100, val_TPR_FPR_rate * 100, val_acc * 100, 
+                val_ACC_threshold * 100, val_threshold, lr)
                 logger.info(line)
                 
                 # for best NME
-                if (np.asarray(val_HTER_history).mean()) < best_HTER:
+                if (val_HTER < best_HTER):
                     print('\n')
-                    new_update = f'Congratulation Best HTER is updated, best_HTER: {best_HTER * 100} upto val_HTER: {np.asarray(val_HTER_history).mean() * 100}'
+                    new_update = f'Congratulation Best HTER is updated, best_HTER: {best_HTER * 100} upto val_HTER: {val_HTER * 100}'
                     logger.info(new_update)
-                    best_HTER = np.asarray(val_HTER_history).mean()
+                    best_HTER = val_HTER
                     logger.info('=> saving checkpoint to {}'.format(os.path.join(save_folder, model_name + '_' + save_name + '_best.pt')))
 
                     # save_threshold = 0.05

@@ -93,6 +93,9 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None)
     train_full_df.to_csv(os.path.join(cfg.LOG.SAVEDF, "train.csv"), index=False)
     val_full_df.to_csv(os.path.join(cfg.LOG.SAVEDF, "val.csv"), index=False)
     
+    logger.info(f"Total train_full_df : {train_full_df['is_spoof'].value_counts()}")
+    logger.info(f"Total val_full_df: {val_full_df['is_spoof'].value_counts()}")
+    
     train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
                                 transform=transforms.Compose([
                                     RemoveBlackBorders(), 
