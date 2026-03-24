@@ -56,7 +56,7 @@ logger.info(f"device : {device}")
 net = get_network(cfg=cfg, device=device, backbone=os.getenv("BACKBONE", default="ViT-B/16"))
 net = load_checkpoint(net, weight_path=os.getenv("WEIGHT", default="best.pt"))
 net.to(device)
-logger.info("load checkpoint is done!")
+logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT", default="best.pt")))
 
 # default sync
 router = APIRouter()
