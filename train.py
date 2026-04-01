@@ -118,7 +118,12 @@ if __name__ == '__main__':
     # --- Device ---
     device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     logger.info(f"device : {device}")
-    logger.info(f"logs args: {args}")
+    
+    # Convert the Namespace object to a dictionary
+    args_dict = vars(args)
+    # Print the dictionary to see all key-value pairs
+    for key, value in args_dict.items():
+        logger.info("logs {}: {}".format(key, value))
     
     # --- TensorBoard ---
     writer = SummaryWriter(log_dir=os.path.join(save_folder, "tensorboard-logs"))
