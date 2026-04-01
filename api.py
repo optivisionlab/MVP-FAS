@@ -2,7 +2,7 @@ import uuid
 from typing import List
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
-from infer import infer_model
+from utils.inference import infer_model
 import torch
 import os
 from models.make_network import get_network, load_checkpoint
