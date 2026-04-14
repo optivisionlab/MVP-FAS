@@ -2,19 +2,24 @@ import os
 import numpy as np
 import cv2
 from torch.utils.data import Dataset
+import random
+from torchvision import transforms
+from loaders.moire import Moire
+from PIL import Image
 
 # metric
 # spoofing    |   real
 # 0 -> Flase      1 -> True
 
 class FAS_Dataset(Dataset):
-    def __init__(self, cfg, dataframe, base_dir, transform=None, is_train=True):
+    def __init__(self, cfg, dataframe, base_dir, transform=None, is_train=True, is_physical=False):
         self.cfg = cfg
         self.is_train = is_train
         self.dataframe = dataframe
         self.base_dir = base_dir
-        
+        self.moire = Moire()
         self.Transform = transform
+        self.is_physical = is_physical
         self.init_aug()
         
     def init_aug(self):
@@ -73,7 +78,20 @@ class FAS_Dataset(Dataset):
 
         if self.is_train:
             Img = self.Flip_Saturation(Img)
-
+        
+        if self.is_train == True and is_spoof == False and self.is_physical == True:
+            prob_value = random.random()
+            if prob_value < 0.1:
+                Img = self.moire(Img)
+                # color_jitter = transforms.ColorJitter(brightness=0.4, contrast=0.4, saturation=0.4, hue=0.4)
+                color_jitter = transforms.ColorJitter(brightness=(0.2, 2.5), contrast=(0.4, 1.5), saturation=0.4, hue=0.4)
+                Img_rgb = cv2.cvtColor(Img, cv2.COLOR_BGR2RGB)
+                image_pil = Image.fromarray(Img_rgb)
+                transformed_image_pil = color_jitter(image_pil)
+                transformed_image_np = np.array(transformed_image_pil)
+                Img = cv2.cvtColor(transformed_image_np, cv2.COLOR_RGB2BGR)
+                is_real = 0
+        
         # numpy to torch tensor and normalize
         if self.Transform is not None:
             Img = self.Transform(Img)
