@@ -79,6 +79,7 @@ if __name__ == '__main__':
     parser.add_argument('--save_path', type=str, default="runs/save_model")
     parser.add_argument('--num_epochs', type=int, default="number of epochs")
     parser.add_argument("--pretrained", action='store_true', help='pretrained')
+    parser.add_argument("--is_physical", action='store_true', help='is_physical')
 
     args = parser.parse_args()
 
@@ -151,7 +152,7 @@ if __name__ == '__main__':
     Similarity_alpha = cfg.TRAIN.SIMILARITY_ALPHA
     Patch_align_beta = cfg.TRAIN.PATCH_ALIGN_BETA
     # get dataset
-    train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING, logger=logger)
+    train_Dataset, val_Dataset = get_Dataset(args, cfg, SETTING=cfg.DATASET.SETTING, logger=logger, is_physical=args.is_physical)
     net = get_network(cfg=cfg, args=args, net_name=model_name, device=device, backbone=args.backbone)
     
     if args.pretrained:

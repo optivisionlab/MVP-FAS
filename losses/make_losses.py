@@ -3,8 +3,8 @@ import torch
 
 def get_loss_fucntion(cfg, loss_name, device):
     if loss_name == 'CrossEntropy':
-        train_loss = torch.nn.CrossEntropyLoss().cuda(device)
-        val_loss = torch.nn.CrossEntropyLoss().cuda(device)
+        train_loss = torch.nn.CrossEntropyLoss(torch.tensor(cfg.TRAIN.WEIGHTS)).cuda(device)
+        val_loss = torch.nn.CrossEntropyLoss(torch.tensor(cfg.TRAIN.WEIGHTS)).cuda(device)
 
     else:
         raise Exception("Undefined loss function")

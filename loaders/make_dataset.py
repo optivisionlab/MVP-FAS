@@ -79,7 +79,7 @@ def get_FAS_dataset(args, cfg, normalize=None, img_size=(224, 224)):
     return train_dataset, val_dataset
 
 
-def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None):
+def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None, is_physical=False):
     full_df = pd.read_csv(args.full_dataset_csv)
     train_object = args.key_train.split(",")
     val_object = args.key_val.split(",")
@@ -103,7 +103,7 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None)
                                     transforms.ToTensor(), 
                                     normalize
                                 ]), 
-                                is_train=True)
+                                is_train=True, is_physical=is_physical)
     
     val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
                               transform=transforms.Compose([
@@ -112,12 +112,12 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None)
                                   transforms.ToTensor(), 
                                   normalize
                                 ]), 
-                              is_train=False)
+                              is_train=False, is_physical=False)
     
     return train_dataset, val_dataset
 
 
-def get_Dataset(args, cfg, SETTING="MCIO", logger=None):
+def get_Dataset(args, cfg, SETTING="MCIO", logger=None, is_physical=False):
     normalize = transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
     
     if SETTING.upper() == "MCIO":
@@ -129,10 +129,14 @@ def get_Dataset(args, cfg, SETTING="MCIO", logger=None):
                                                       img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE),
                                                       normalize=normalize)
     elif SETTING.upper() == "FAS":
-        train_dataset, val_dataset = get_FAS_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE))
+        train_dataset, val_dataset = get_FAS_dataset(args=args, cfg=cfg, normalize=normalize, 
+                                                     img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE),
+                                                     is_physical=is_physical)
 
     elif SETTING.upper() == 'ALL':
-        train_dataset, val_dataset = get_ALL_dataset(args=args, cfg=cfg, normalize=normalize, img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE), logger=logger)
+        train_dataset, val_dataset = get_ALL_dataset(args=args, cfg=cfg, normalize=normalize, 
+                                                     img_size=(cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE), logger=logger,
+                                                     is_physical=is_physical)
 
     return train_dataset, val_dataset
 

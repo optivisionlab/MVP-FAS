@@ -60,7 +60,14 @@ def get_EER_states(probs, labels, grid_density=10000):
 def calculate_threshold(probs, labels, threshold):
     TN, FN, FP, TP = eval_state(probs, labels, threshold)
     ACC = (TP + TN) / labels.shape[0]
-    return ACC
+    
+    confusion_matrix = {
+        "TN": TN,
+        "FP": FP,
+        "FN": FN,
+        "TP": TP
+    }
+    return ACC, confusion_matrix
 
 def get_HTER_at_thr(probs, labels, thr):
     TN, FN, FP, TP = eval_state(probs, labels, thr)
@@ -109,7 +116,7 @@ class Metric():
 
         eer, threshold, _, _ = get_EER_states(probs, labels)
         hter = get_HTER_at_thr(probs, labels, threshold)
-        acc_thr = calculate_threshold(probs, labels, threshold)
+        acc_thr, _ = calculate_threshold(probs, labels, threshold)
 
         auc = -1
         tpr_fpr = -1
