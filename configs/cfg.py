@@ -33,7 +33,7 @@ _C.TRAIN = CN()
 _C.TRAIN.NUM_WORKERS = 16
 _C.TRAIN.SIMILARITY_ALPHA = 1.0
 _C.TRAIN.PATCH_ALIGN_BETA = 1.0
-_C.TRAIN.WEIGHTS = [5.0, 1.0] # [spoof, live]
+_C.TRAIN.WEIGHTS = [10.0, 1.0] # [spoof, live]
 
 _C.TRAIN.OPTIMIZER = 'adamw'
 _C.TRAIN.LR = 1e-7 # 1e-7
