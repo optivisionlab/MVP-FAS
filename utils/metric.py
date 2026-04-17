@@ -81,7 +81,7 @@ def get_HTER_at_thr(probs, labels, thr):
         FAR = FP / float(FP + TN)
         FRR = FN / float(FN + TP)
     HTER = (FAR + FRR) / 2.0
-    return HTER
+    return HTER, FAR, FRR
 
 def accuracy(output, target, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
@@ -115,7 +115,7 @@ class Metric():
         acc = ((probs > 0.5) == labels).mean()
 
         eer, threshold, _, _ = get_EER_states(probs, labels)
-        hter = get_HTER_at_thr(probs, labels, threshold)
+        hter, far, frr = get_HTER_at_thr(probs, labels, threshold)
         acc_thr, _ = calculate_threshold(probs, labels, threshold)
 
         auc = -1

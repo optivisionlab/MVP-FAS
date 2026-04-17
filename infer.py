@@ -18,6 +18,86 @@ import cv2
 from ultralytics import YOLO
 
 
+def crop_face_with_expand(
+    img,
+    yolo_face_model,
+    device="cuda",
+    conf=0.5,
+    scale_w=1.3,
+    scale_h=1.5,
+    square=False
+):
+    """
+    Crop face từ YOLO + mở rộng bbox (phù hợp FAS)
+
+    Args:
+        img: PIL Image
+        yolo_face_model: model YOLO detect face
+        device: cpu/cuda
+        conf: confidence threshold
+        scale_w: scale chiều ngang
+        scale_h: scale chiều dọc
+        square: ép bbox thành hình vuông
+
+    Returns:
+        cropped_img (PIL) hoặc None nếu không detect được face
+        bbox (list) hoặc None
+    """
+
+    results = yolo_face_model.predict(
+        img,
+        device=device,
+        conf=conf,
+        classes=[0],
+        verbose=False
+    )
+
+    for result in results:
+        if result.boxes is None or len(result.boxes) == 0:
+            return None, None
+
+        boxes = result.boxes
+        best_idx = int(np.argmax(boxes.conf.cpu().numpy()))
+
+        x_min, y_min, x_max, y_max = map(int, boxes.xyxy[best_idx].cpu().numpy())
+
+        # ===== expand bbox =====
+        w = x_max - x_min
+        h = y_max - y_min
+
+        cx = (x_min + x_max) / 2
+        cy = (y_min + y_max) / 2
+
+        new_w = w * scale_w
+        new_h = h * scale_h
+
+        # optional: ép vuông
+        if square:
+            side = max(new_w, new_h)
+            new_w = new_h = side
+
+        new_x_min = int(cx - new_w / 2)
+        new_x_max = int(cx + new_w / 2)
+        new_y_min = int(cy - new_h / 2)
+        new_y_max = int(cy + new_h / 2)
+
+        # ===== clip boundary =====
+        img_w, img_h = img.size
+
+        new_x_min = max(0, new_x_min)
+        new_y_min = max(0, new_y_min)
+        new_x_max = min(img_w, new_x_max)
+        new_y_max = min(img_h, new_y_max)
+
+        bbox = [new_x_min, new_y_min, new_x_max, new_y_max]
+
+        cropped_img = img.crop(tuple(bbox))
+
+        return cropped_img, bbox
+
+    return None, None
+
+
 def get_eta(batch_time, batch_index, loader_len, this_epoch, max_epoch):
     # this epoch start 0
     this_epoch_eta = int(batch_time * (loader_len - (batch_index + 1)))
@@ -186,42 +266,31 @@ if __name__ == '__main__':
 
                 if args.YOLO_FACE:
                     createDirectory(os.path.join(save_folder, 'crop_image_face'))
-                    results_face = yolo_face_model.predict(img, device=device, conf=0.5, classes=[0])
                     
-                    for f_result in results_face:
-                        
-                        f_boxes = f_result.boxes
-                        f_best_idx = int(np.argmax(f_boxes.conf.cpu().numpy()))
-                        f_x_min, f_y_min, f_x_max, f_y_max = map(int, f_boxes.xyxy[f_best_idx].cpu().numpy())
-                        f_bbox = [f_x_min, f_y_min, f_x_max, f_y_max]
-                        f_cropped_img = img.crop(tuple(f_bbox))
-                        
-                        prob3 = infer_model(net_face_crop, cfg, device, img=f_cropped_img)
-                        logger.info(f"infer step 3: path: {os.path.join(args.root_dir, path)} - {prob3} - {'live' if prob3[0] > args.threshold else 'spoof'} \n")
-                        
-                        if prob3[0] > args.threshold:
-                            if args.YOLO_DET_MASK:
-                                results_mask = yolo_det_mask.predict(img, device=device, conf=0.7)
-                                for r_mask in results_mask:
-                                    obb = getattr(r_mask, "obb", None)
-                                    has_object = obb is not None and getattr(obb, "conf", None) is not None and len(obb.conf) > 0
-                                    pred = 'spoof' if has_object else 'live'
-                                    preds_score.append(int(not has_object))
-                                    logger.info(f"infer step 4: path: {os.path.join(args.root_dir, path)} - {int(not has_object)} - {pred} \n")
-                            else:
-                                preds_score.append(prob3[0])
-                                pred = 'live' if prob3[0] > args.threshold else 'spoof'
+                    img_crop, _ = crop_face_with_expand(img=img, yolo_face_model=yolo_face_model, device=0, conf=0.5)                    
+                    prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
+                    logger.info(f"infer step 3: path: {os.path.join(args.root_dir, path)} - {prob3} - {'live' if prob3[0] > args.threshold else 'spoof'} \n")
+                    
+                    if prob3[0] > args.threshold:
+                        if args.YOLO_DET_MASK:
+                            results_mask = yolo_det_mask.predict(img, device=device, conf=0.7)
+                            for r_mask in results_mask:
+                                obb = getattr(r_mask, "obb", None)
+                                has_object = obb is not None and getattr(obb, "conf", None) is not None and len(obb.conf) > 0
+                                pred = 'spoof' if has_object else 'live'
+                                preds_score.append(int(not has_object))
+                                logger.info(f"infer step 4: path: {os.path.join(args.root_dir, path)} - {int(not has_object)} - {pred} \n")
                         else:
                             preds_score.append(prob3[0])
                             pred = 'live' if prob3[0] > args.threshold else 'spoof'
+                    else:
+                        preds_score.append(prob3[0])
+                        pred = 'live' if prob3[0] > args.threshold else 'spoof'
+                    
+                    if args.YOLO_FACE_SAVE and pred != target:
+                        img_crop.save(os.path.join(save_folder, 'crop_image_face', os.path.basename(path)))
+                        logger.info("SAVE CROP FACE IMAGE: path: {}".format(os.path.join(save_folder, 'crop_image_face', os.path.basename(path))))
                         
-                        if args.YOLO_FACE_SAVE and pred != target:
-                            f_cropped_img.save(os.path.join(save_folder, 'crop_image_face', os.path.basename(path)))
-                            logger.info("SAVE CROP FACE IMAGE: path: {}".format(os.path.join(save_folder, 'crop_image_face', os.path.basename(path))))
-                        
-                        
-                
-                
                 if not args.YOLO_DET_MASK and not args.YOLO_FACE and not args.YOLO:
                     preds_score.append(prob1[0])
                     pred = 'live' if prob1[0] > args.threshold else 'spoof'
@@ -255,7 +324,7 @@ if __name__ == '__main__':
         logger.info(classification_report(targets, preds, target_names=['live', 'spoof']))
     
     EER_score, threshold, _, _ = get_EER_states(np.array(preds_score), np.array(targets_score))
-    HTER_score = get_HTER_at_thr(np.array(preds_score), np.array(targets_score), threshold)
+    HTER_score, FAR_score, FRR_score = get_HTER_at_thr(np.array(preds_score), np.array(targets_score), threshold)
     
     acc_threshold, cm_threshold = calculate_threshold(probs=np.array(preds_score), labels=np.array(targets_score), threshold=threshold)
     logger.info(f"acc_threshold: {acc_threshold} - cm_threshold: {cm_threshold}")
@@ -263,7 +332,7 @@ if __name__ == '__main__':
     df = pd.DataFrame(logs_csv, columns=['path', 'pred', 'target', 'output'])
     df.to_csv(os.path.join(save_folder, 'logs_results.csv'), index=False)
     
-    logger.info(f"EER_score: {EER_score}, HTER_score: {HTER_score}, threshold: {threshold}")
+    logger.info(f"EER_score: {EER_score}, HTER_score: {HTER_score}, FAR_score ~ APCER: {FAR_score}, FRR_score ~ BPCER: {FRR_score} threshold: {threshold}")
     logger.info(f"checkpoint: {args.weights}")
     logger.info(f">>>>>>>>>>>>> Save Infer to : {save_folder} <<<<<<<<<<<<<<<<<<<")
     
