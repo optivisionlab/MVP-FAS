@@ -38,17 +38,21 @@ def check_input(uid, files, urls, data):
     return invalid_files, invalid_urls
 
 
-def infer_api(net, cfg, device, file_name, img, yolo_face_model=None, net_face_crop=None, threshold=0.5, YOLO_Det=False, conf_det=0.5):
+def infer_api(net, cfg, device, file_name, img, yolo_face_model=None, net_face_crop=None, threshold=0.5, YOLO_Det=False, conf_det=0.5, uuid=''):
     pil_image = Image.fromarray(img)
     prob1 = infer_model(net, cfg, device, img=pil_image)
-        
+    logger.info(f"uuid: {uuid} - step 1 - infer full image : {file_name} - {prob1} - {'live' if prob1[0] > threshold else 'spoof'}")
+    
     if prob1[0] > threshold:
         if YOLO_Det:
             img_crop, _ = crop_face_with_expand(img=pil_image, yolo_face_model=yolo_face_model, device=device, conf=conf_det)
             if img_crop is None:
                 prob = 0.0 # auto spoof ~ vì không thể không det được face trong điều kiện môi trường bình thường
+                logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - Face not found!")
+                
             else:
                 prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
+                logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - {prob3} - {'live' if prob3[0] > threshold else 'spoof'}")
                 prob = prob3[0]
     else:
         prob = prob1[0]
@@ -132,7 +136,8 @@ async def api_vft_ekyb(
         images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
         for img, file_name in zip(images, files_name):
             output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det, 
-                               threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2)
+                               threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
+                               uuid=xgw_id)
             if output['is_spoof']:
                 data['spoof'] = True
             results.append(output)
@@ -146,7 +151,8 @@ async def api_vft_ekyb(
             images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
             for img, file_name in zip(images, files_name):
                 output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det,
-                                   threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2)
+                                   threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
+                                   uuid=xgw_id)
                 if output['is_spoof']:
                     data['spoof'] = True
                 results.append(output)
