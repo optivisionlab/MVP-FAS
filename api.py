@@ -131,35 +131,39 @@ async def api_vft_ekyb(
 
     st_time = time.time()
     invalid_files, invalid_urls = check_input(uid, files, urls, data)
-    
-    if not invalid_files: # from file
-        images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
-        for img, file_name in zip(images, files_name):
-            output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det, 
-                               threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
-                               uuid=xgw_id)
-            if output['is_spoof']:
-                data['spoof'] = True
-            results.append(output)
-
-    elif not invalid_urls: # from url
-        path_files = []
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            for url in urls:
-                file_path, _ = await download_file_from_urls3(url=url, save_path=tmpdirname, uid=uid, timeout=15)
-                path_files.append(file_path)
-            images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
+    try:
+        if not invalid_files: # from file
+            images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
             for img, file_name in zip(images, files_name):
-                output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det,
-                                   threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
-                                   uuid=xgw_id)
+                output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det, 
+                                threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
+                                uuid=xgw_id)
                 if output['is_spoof']:
                     data['spoof'] = True
                 results.append(output)
-            
-    else:
+
+        elif not invalid_urls: # from url
+            path_files = []
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                for url in urls:
+                    file_path, _ = await download_file_from_urls3(url=url, save_path=tmpdirname, uid=uid, timeout=15)
+                    path_files.append(file_path)
+                images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
+                for img, file_name in zip(images, files_name):
+                    output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det,
+                                    threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
+                                    uuid=xgw_id)
+                    if output['is_spoof']:
+                        data['spoof'] = True
+                    results.append(output)
+                
+        else:
+            data['detail'] = 'HTTP 400 BAD REQUEST'
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=data)
+    except Exception as e:
         data['detail'] = 'HTTP 400 BAD REQUEST'
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=data)
+    
     ed_time = time.time()
     data['spoofs'] = results
     data['latency_ms'] = ed_time - st_time
