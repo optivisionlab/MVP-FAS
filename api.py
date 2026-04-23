@@ -45,8 +45,11 @@ def infer_api(net, cfg, device, file_name, img, yolo_face_model=None, net_face_c
     if prob1[0] > threshold:
         if YOLO_Det:
             img_crop, _ = crop_face_with_expand(img=pil_image, yolo_face_model=yolo_face_model, device=device, conf=conf_det)
-            prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
-            prob = prob3[0]
+            if img_crop is None:
+                prob = 0.0 # auto spoof ~ vì không thể không det được face trong điều kiện môi trường bình thường
+            else:
+                prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
+                prob = prob3[0]
     else:
         prob = prob1[0]
     

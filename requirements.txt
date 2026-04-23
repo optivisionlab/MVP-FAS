@@ -58,3 +58,4 @@ pandas==2.0.3
 
 # logs
 tensorboard==2.20.0
+ultralytics==8.4.37
