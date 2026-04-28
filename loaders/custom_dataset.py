@@ -6,6 +6,23 @@ import random
 from torchvision import transforms
 from loaders.moire import Moire
 from PIL import Image
+from torchvision.transforms import functional as F
+
+class RandomLuxTransform:
+    def __init__(self, lux_min=200, lux_max=550,
+                 factor_min=0.6, factor_max=1.5):
+        self.lux_min = lux_min
+        self.lux_max = lux_max
+        self.factor_min = factor_min
+        self.factor_max = factor_max
+
+    def __call__(self, img):
+        lux = random.uniform(self.lux_min, self.lux_max)
+
+        alpha = (lux - self.lux_min) / (self.lux_max - self.lux_min)
+        factor = self.factor_min + alpha * (self.factor_max - self.factor_min)
+
+        return F.adjust_brightness(img, factor)
 
 # metric
 # spoofing    |   real
@@ -90,7 +107,24 @@ class FAS_Dataset(Dataset):
                 transformed_image_pil = color_jitter(image_pil)
                 transformed_image_np = np.array(transformed_image_pil)
                 Img = cv2.cvtColor(transformed_image_np, cv2.COLOR_RGB2BGR)
-                is_real = 0
+                is_real = 0 # biến từ live -> spoof
+            elif prob_value >= 0.1 and prob_value <= 0.3:
+                # live nhưng điều chỉnh ánh sáng
+                transforms_lux = transforms.Compose([
+                        RandomLuxTransform(200, 550),
+                        # biến thiên local
+                        transforms.ColorJitter(
+                            brightness=0.2,
+                            contrast=0.2,
+                            saturation=0.1
+                        )
+                    ])
+                Img_rgb = cv2.cvtColor(Img, cv2.COLOR_BGR2RGB)
+                Img_pil = Image.fromarray(Img_rgb)
+                Img_t = transforms_lux(Img_pil)
+                Img_np = np.array(Img_t)
+                Img = cv2.cvtColor(Img_np, cv2.COLOR_RGB2BGR)
+                
         
         # numpy to torch tensor and normalize
         if self.Transform is not None:
