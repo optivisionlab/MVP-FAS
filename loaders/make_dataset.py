@@ -69,11 +69,11 @@ def get_FAS_dataset(args, cfg, normalize=None, img_size=(224, 224)):
     val_df = shuffle(pd.read_csv(args.val_csv, usecols=['path', 'is_spoof']), random_state=args.seed)
 
     train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_df, base_dir=args.root_dir, 
-                                transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                                transform=transforms.Compose([transforms.ToTensor(), transforms.Resize(img_size), normalize]), 
                                 is_train=True)
     
     val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_df, base_dir=args.root_dir, 
-                              transform=transforms.Compose([transforms.ToTensor(), normalize, transforms.Resize(img_size)]), 
+                              transform=transforms.Compose([transforms.ToTensor(), transforms.Resize(img_size), normalize]), 
                               is_train=False)
 
     return train_dataset, val_dataset
