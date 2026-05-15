@@ -56,6 +56,7 @@ def infer_api(net, cfg, device, file_name, img, yolo_face_model=None, net_face_c
                 prob = prob3[0]
     else:
         prob = prob1[0]
+        logger.info(f"uuid: {uuid} - step 1 - infer full image : {file_name} - {prob1} - {'live' if prob1[0] > threshold else 'spoof'}")
     
     return {
         'source': file_name,
@@ -162,6 +163,10 @@ async def api_vft_ekyb(
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=data)
     except Exception as e:
         data['detail'] = 'HTTP 400 BAD REQUEST'
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        tb_info = traceback.extract_tb(exc_tb)
+        logger.error("ID {} >>> ERROR inference file: {}, Message Error: {}, exc_type: {}, exc_obj: {}, \
+                        exc_tb: {}, tb_info: {}". format(str(uid), str(e), exc_type, exc_obj, exc_tb, tb_info))
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=data)
     
     ed_time = time.time()
