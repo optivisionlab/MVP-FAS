@@ -167,12 +167,12 @@ if __name__ == '__main__':
     parser.add_argument("--YOLO_FACE", action='store_true', help='use YOLO_FACE')
     parser.add_argument("--YOLO_FACE_SAVE", action='store_true', help='SAVE IMAGE CROP YOLO_FACE')
     parser.add_argument("--threshold", type=float, default=0.5, help='tune threshold')
-    parser.add_argument("--YOLO_DET_MASK", action='store_true', help='user model YOLO_DET_MASK')
+    # parser.add_argument("--YOLO_DET_MASK", action='store_true', help='user model YOLO_DET_MASK')
     parser.add_argument("--MVP_FAS_FACE_CROP", action='store_true', help='user model MVP_FAS_FACE_CROP')
     parser.add_argument("--weights_mvp_face_crop", type=str, default='weights_mvp_face_crop.pt', help='use weights_mvp_face_crop for infer')
     parser.add_argument("--weights_yolo_det", type=str, default='yolo.pt', help='use weights_yolo_det for infer')
     parser.add_argument("--weights_yolo_det_face", type=str, default='yolo.pt', help='use weights_yolo_det_face for infer')
-    parser.add_argument("--weights_yolo_det_mask", type=str, default='yolo.pt', help='use weights_yolo_det_mask for infer')
+    # parser.add_argument("--weights_yolo_det_mask", type=str, default='yolo.pt', help='use weights_yolo_det_mask for infer')
     
     
     net, net_face_crop, yolo_model, yolo_face_model, yolo_det_mask = None, None, None, None, None
@@ -223,9 +223,6 @@ if __name__ == '__main__':
     if args.YOLO_FACE:
         yolo_face_model = YOLO(args.weights_yolo_det_face)
     
-    if args.YOLO_DET_MASK:
-        yolo_det_mask = YOLO(args.weights_yolo_det_mask)
-    
     test_df = pd.read_csv(args.test_csv, usecols=['path', 'is_spoof'])
     preds, preds_score = [], []
     targets, targets_score = [], []
@@ -270,28 +267,14 @@ if __name__ == '__main__':
                     img_crop, _ = crop_face_with_expand(img=img, yolo_face_model=yolo_face_model, device=0, conf=0.5)                    
                     prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
                     logger.info(f"infer step 3: path: {os.path.join(args.root_dir, path)} - {prob3} - {'live' if prob3[0] > args.threshold else 'spoof'} \n")
-                    
-                    if prob3[0] > args.threshold:
-                        if args.YOLO_DET_MASK:
-                            results_mask = yolo_det_mask.predict(img, device=device, conf=0.7)
-                            for r_mask in results_mask:
-                                obb = getattr(r_mask, "obb", None)
-                                has_object = obb is not None and getattr(obb, "conf", None) is not None and len(obb.conf) > 0
-                                pred = 'spoof' if has_object else 'live'
-                                preds_score.append(int(not has_object))
-                                logger.info(f"infer step 4: path: {os.path.join(args.root_dir, path)} - {int(not has_object)} - {pred} \n")
-                        else:
-                            preds_score.append(prob3[0])
-                            pred = 'live' if prob3[0] > args.threshold else 'spoof'
-                    else:
-                        preds_score.append(prob3[0])
-                        pred = 'live' if prob3[0] > args.threshold else 'spoof'
+                    preds_score.append(prob3[0])
+                    pred = 'live' if prob3[0] > args.threshold else 'spoof'
                     
                     if args.YOLO_FACE_SAVE and pred != target:
                         img_crop.save(os.path.join(save_folder, 'crop_image_face', os.path.basename(path)))
                         logger.info("SAVE CROP FACE IMAGE: path: {}".format(os.path.join(save_folder, 'crop_image_face', os.path.basename(path))))
                         
-                if not args.YOLO_DET_MASK and not args.YOLO_FACE and not args.YOLO:
+                if not args.YOLO_FACE and not args.YOLO:
                     preds_score.append(prob1[0])
                     pred = 'live' if prob1[0] > args.threshold else 'spoof'
 
