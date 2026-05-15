@@ -2,7 +2,7 @@ import uuid
 from typing import List
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import JSONResponse
-from utils.inference import infer_model
+from utils.inference import infer_model, crop_face_with_expand
 import torch
 import os
 from models.make_network import get_network, load_checkpoint
@@ -13,6 +13,7 @@ from utils.utils import load_form_data, load_from_local, download_file_from_urls
 from PIL import Image
 import tempfile
 import datetime, time
+from ultralytics import YOLO
 
 
 logger = get_logger()
@@ -37,14 +38,30 @@ def check_input(uid, files, urls, data):
     return invalid_files, invalid_urls
 
 
-def infer_api(net, cfg, device, file_name, img, threshold=0.5):
+def infer_api(net, cfg, device, file_name, img, yolo_face_model=None, net_face_crop=None, threshold=0.5, YOLO_Det=False, conf_det=0.5, uuid=''):
     pil_image = Image.fromarray(img)
-    prob = infer_model(net, cfg, device, img=pil_image)
+    prob1 = infer_model(net, cfg, device, img=pil_image)
+    logger.info(f"uuid: {uuid} - step 1 - infer full image : {file_name} - {prob1} - {'live' if prob1[0] > threshold else 'spoof'}")
+    
+    if prob1[0] > threshold:
+        if YOLO_Det:
+            img_crop, _ = crop_face_with_expand(img=pil_image, yolo_face_model=yolo_face_model, device=device, conf=conf_det)
+            if img_crop is None:
+                prob = 0.0 # auto spoof ~ vì không thể không det được face trong điều kiện môi trường bình thường
+                logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - Face not found!")
+                
+            else:
+                prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
+                logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - {prob3} - {'live' if prob3[0] > threshold else 'spoof'}")
+                prob = prob3[0]
+    else:
+        prob = prob1[0]
+    
     return {
         'source': file_name,
-        'prob': "{:.4f}".format((1 - prob[0]) * 100),
-        'label': 'live' if prob[0] > threshold else 'spoof',
-        'is_spoof': False if prob[0] > threshold else True,
+        'prob': "{:.4f}".format((1 - prob) * 100),
+        'label': 'live' if prob > threshold else 'spoof',
+        'is_spoof': False if prob > threshold else True,
     }
 
 
@@ -53,10 +70,21 @@ device = torch.device(f"cuda:{os.getenv('DEVICE', default='0')}" if torch.cuda.i
 logger.info(f"device : {device}")
 
 # --- setup -----
-net = get_network(cfg=cfg, device=device, backbone=os.getenv("BACKBONE", default="ViT-B/16"))
-net = load_checkpoint(net, weight_path=os.getenv("WEIGHT", default="best.pt"))
-net.to(device)
+logger.info("load checkpoint is {}".format(os.getenv("WEIGHT", default="best.pt")))
+net1 = get_network(cfg=cfg, device=device, backbone=os.getenv("BACKBONE", default="ViT-B/16"))
+net1 = load_checkpoint(net1, weight_path=os.getenv("WEIGHT", default="best.pt"))
+net1.to(device)
 logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT", default="best.pt")))
+
+logger.info("load checkpoint is {}".format(os.getenv("WEIGHT_FACE", default="best.pt")))
+net2 = get_network(cfg=cfg, device=device, backbone=os.getenv("BACKBONE", default="ViT-B/16"))
+net2 = load_checkpoint(net1, weight_path=os.getenv("WEIGHT_FACE", default="best.pt"))
+net2.to(device)
+logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT_FACE", default="best.pt")))
+
+logger.info("load checkpoint is {}".format(os.getenv("WEIGHT_YOLO_DET", default="best.pt")))
+yolo_face_model = YOLO(os.getenv("WEIGHT_YOLO_DET", default="best.pt"))
+logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT_YOLO_DET", default="best.pt")))
 
 # default sync
 router = APIRouter()
@@ -71,7 +99,14 @@ def ping():
 
 
 @router.post("/vft-fas") # Giấy tờ ĐKKD
-async def api_vft_ekyb(request: Request, files: List[UploadFile] = File(None), urls: list[str] = Form(None), threshold: float = Form(0.5)):
+async def api_vft_ekyb(
+        request: Request, 
+        files: List[UploadFile] = File(None), 
+        urls: list[str] = Form(None), 
+        threshold: float = Form(0.5),
+        threshold_det: float = Form(0.5),
+        yolo_det: bool = Form(True)
+    ):
     
     uid, results = uuid.uuid1(), []
     data = {
@@ -89,38 +124,46 @@ async def api_vft_ekyb(request: Request, files: List[UploadFile] = File(None), u
     xgw_id = request.headers.get("Xgw-Request-Id", str(uid))
     
     logger.info(
-        "ID: {} input data: files={}, url={}, partner={}, source={}, xgw_id={}, threshold: {}, type_threshold: {}".format(
-            uid, files, urls, partner, source, xgw_id, threshold, type(threshold)
+        "ID: {} input data: files={}, url={}, partner={}, source={}, xgw_id={}, threshold: {}, threshold_det: {}, yolo_det: {}".format(
+            uid, files, urls, partner, source, xgw_id, threshold, threshold_det, yolo_det
         )
     )
 
     st_time = time.time()
     invalid_files, invalid_urls = check_input(uid, files, urls, data)
-    
-    if not invalid_files: # from file
-        images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
-        for img, file_name in zip(images, files_name):
-            output = infer_api(net, cfg, device, file_name=file_name, img=img, threshold=threshold)
-            if output['is_spoof']:
-                data['spoof'] = True
-            results.append(output)
-
-    elif not invalid_urls: # from url
-        path_files = []
-        with tempfile.TemporaryDirectory() as tmpdirname:
-            for url in urls:
-                file_path, _ = await download_file_from_urls3(url=url, save_path=tmpdirname, uid=uid, timeout=15)
-                path_files.append(file_path)
-            images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
+    try:
+        if not invalid_files: # from file
+            images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
             for img, file_name in zip(images, files_name):
-                output = infer_api(net, cfg, device, file_name=file_name, img=img, threshold=threshold)
+                output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det, 
+                                threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
+                                uuid=xgw_id)
                 if output['is_spoof']:
                     data['spoof'] = True
                 results.append(output)
-            
-    else:
+
+        elif not invalid_urls: # from url
+            path_files = []
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                for url in urls:
+                    file_path, _ = await download_file_from_urls3(url=url, save_path=tmpdirname, uid=uid, timeout=15)
+                    path_files.append(file_path)
+                images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
+                for img, file_name in zip(images, files_name):
+                    output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det,
+                                    threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
+                                    uuid=xgw_id)
+                    if output['is_spoof']:
+                        data['spoof'] = True
+                    results.append(output)
+                
+        else:
+            data['detail'] = 'HTTP 400 BAD REQUEST'
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=data)
+    except Exception as e:
         data['detail'] = 'HTTP 400 BAD REQUEST'
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=data)
+    
     ed_time = time.time()
     data['spoofs'] = results
     data['latency_ms'] = ed_time - st_time

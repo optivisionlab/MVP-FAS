@@ -1,5 +1,7 @@
 export BACKBONE='ViT-B/16'
-export WEIGHT='runs/clip/train_28/MVP_FAS_ViT-B-16/weights/MVP_FAS_ViT-B-16_best_ckpt.pt'
+export WEIGHT='/data/manhquang/dataset/fas/solution/MVP-FAS/runs/weights/MVP_FAS_ViT-B-16_best_ckpt_260415.pt'
+export WEIGHT_FACE='/data/manhquang/dataset/fas/solution/MVP-FAS/runs/weights/MVP_FAS_ViT-B-16_best_ckpt_260415.pt'
+export WEIGHT_YOLO_DET="/data/manhquang/dataset/fas/solution/MVP-FAS/runs/weights/yolov12l-face.pt"
 export DEVICE='0'
 export HOST='0.0.0.0'
 export PORT='9999'
