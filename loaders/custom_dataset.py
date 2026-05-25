@@ -266,6 +266,7 @@ class FAS_Dataset(Dataset):
                 Img = ceiling_light.apply(Img)
         
         # numpy to torch tensor and normalize
+        Img = Image.fromarray(Img) # nếu không sài cái RemoveBlackBorders
         if self.Transform is not None:
             Img = self.Transform(Img)
 
