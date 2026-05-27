@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import torch
 import numpy as np
@@ -6,6 +7,10 @@ import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms as transforms
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from configs.cfg import _C as cfg
 from models.make_network import get_network, load_checkpoint
 from loaders.make_dataset import RemoveBlackBorders
