@@ -47,6 +47,16 @@ _C.TRAIN.LR_FACTOR = 0.1
 _C.TRAIN.EPOCH = 100
 _C.TRAIN.LR_STEP = [5]
 
+# Scheduler: 'multistep' (legacy) or 'cosine'
+_C.TRAIN.SCHEDULER = 'cosine'
+_C.TRAIN.WARMUP_EPOCHS = 2
+_C.TRAIN.WARMUP_START_FACTOR = 0.01
+_C.TRAIN.LR_MIN = 1e-7
+
+# AMP + gradient clipping
+_C.TRAIN.AMP = True
+_C.TRAIN.GRAD_CLIP = 1.0
+
 _C.MCIO = CN()
 _C.MCIO.Random_Horizontal_Flip = True
 _C.MCIO.Random_Saturation = True

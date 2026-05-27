@@ -8,6 +8,8 @@ import logging
 from tqdm import tqdm
 import torch
 from torch import optim
+from torch.cuda.amp import autocast, GradScaler
+from torch.optim.lr_scheduler import CosineAnnealingLR, LinearLR, SequentialLR, MultiStepLR
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from configs.cfg import _C as cfg
@@ -169,7 +171,33 @@ if __name__ == '__main__':
         optimizer = optim.SGD(net.parameters(), lr=cfg.TRAIN.LR, momentum=0.9, weight_decay=cfg.TRAIN.WEIGHT_DECAY)
 
     if resume == True: net, optimizer, last_epoch = set_pretrained_setting(net, optimizer, checkpoint)
-    scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, cfg.TRAIN.LR_STEP, cfg.TRAIN.LR_FACTOR, last_epoch=last_epoch)
+
+    if cfg.TRAIN.SCHEDULER == 'cosine':
+        warmup_epochs = cfg.TRAIN.WARMUP_EPOCHS
+        if warmup_epochs > 0:
+            warmup = LinearLR(optimizer,
+                              start_factor=cfg.TRAIN.WARMUP_START_FACTOR,
+                              end_factor=1.0,
+                              total_iters=warmup_epochs)
+            cosine = CosineAnnealingLR(optimizer,
+                                       T_max=max(1, max_epoch - warmup_epochs),
+                                       eta_min=cfg.TRAIN.LR_MIN)
+            scheduler = SequentialLR(optimizer,
+                                     schedulers=[warmup, cosine],
+                                     milestones=[warmup_epochs])
+        else:
+            scheduler = CosineAnnealingLR(optimizer,
+                                          T_max=max_epoch,
+                                          eta_min=cfg.TRAIN.LR_MIN)
+    else:
+        scheduler = MultiStepLR(optimizer, cfg.TRAIN.LR_STEP, cfg.TRAIN.LR_FACTOR, last_epoch=last_epoch)
+
+    # AMP scaler — disabled becomes a no-op when AMP is off
+    use_amp = bool(cfg.TRAIN.AMP) and device.type == 'cuda'
+    scaler = GradScaler(enabled=use_amp)
+    grad_clip = cfg.TRAIN.GRAD_CLIP
+    logger.info(f"AMP enabled: {use_amp} | grad_clip: {grad_clip} | scheduler: {cfg.TRAIN.SCHEDULER}")
+
     CE_loss, val_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
     patch_align_CE_loss, val_patch_align_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
 
@@ -197,20 +225,24 @@ if __name__ == '__main__':
             # Domain = target['Domain']#.cuda(device)
             # Attack_type = target['Attack_type']#.cuda(device)
 
-            results = net(img, target)
-            output_list = results['similarity']
-            patch_alignment_results = results['patch_alignment']
-            
-            ############################
+            optimizer.zero_grad(set_to_none=True)
 
-            optimizer.zero_grad()
-            Similarity_loss = CE_loss(output_list, Is_real)
-            patch_alignment_loss = patch_align_CE_loss(patch_alignment_results, Is_real)
+            with autocast(enabled=use_amp):
+                results = net(img, target)
+                output_list = results['similarity']
+                patch_alignment_results = results['patch_alignment']
 
-            loss = (Similarity_loss * Similarity_alpha) + (patch_alignment_loss * Patch_align_beta)
-            # backward
-            loss.backward()
-            optimizer.step()
+                Similarity_loss = CE_loss(output_list, Is_real)
+                patch_alignment_loss = patch_align_CE_loss(patch_alignment_results, Is_real)
+
+                loss = (Similarity_loss * Similarity_alpha) + (patch_alignment_loss * Patch_align_beta)
+
+            scaler.scale(loss).backward()
+            if grad_clip is not None and grad_clip > 0:
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=grad_clip)
+            scaler.step(optimizer)
+            scaler.update()
 
             train_total_loss_history.append(loss.item())
             train_Sim_loss_history.append(Similarity_loss.item())
@@ -262,14 +294,16 @@ if __name__ == '__main__':
                     # val_Attack_type = val_target['Attack_type']#.cuda(device)
 
                     # forward
-                    val_results = net(val_img, val_target)
-                    val_output_list = val_results['similarity']
-                    val_patch_alignment_results = val_results['patch_alignment']
-                    
-                    val_patch_alignment_loss = val_patch_align_CE_loss(val_patch_alignment_results, val_Is_real)
-                    val_sim_loss = val_CE_loss(val_output_list, val_Is_real).cpu().numpy()
+                    with autocast(enabled=use_amp):
+                        val_results = net(val_img, val_target)
+                        val_output_list = val_results['similarity']
+                        val_patch_alignment_results = val_results['patch_alignment']
 
-                    val_loss = (val_sim_loss * Similarity_alpha) + (val_patch_alignment_loss * Patch_align_beta)
+                        val_patch_alignment_loss = val_patch_align_CE_loss(val_patch_alignment_results, val_Is_real)
+                        val_sim_loss_tensor = val_CE_loss(val_output_list, val_Is_real)
+
+                    val_sim_loss = val_sim_loss_tensor.detach().float().cpu().numpy()
+                    val_loss = (val_sim_loss * Similarity_alpha) + (val_patch_alignment_loss.detach().float().cpu().numpy() * Patch_align_beta)
                     
                     val_total_loss_history.append(val_loss.item())
                     val_Sim_loss_history.append(val_sim_loss.item())
