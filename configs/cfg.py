@@ -57,6 +57,10 @@ _C.TRAIN.LR_MIN = 1e-7
 _C.TRAIN.AMP = True
 _C.TRAIN.GRAD_CLIP = 1.0
 
+# Supervised Contrastive
+_C.TRAIN.SUPCON_GAMMA = 0.5
+_C.TRAIN.SUPCON_TAU = 0.07
+
 _C.MCIO = CN()
 _C.MCIO.Random_Horizontal_Flip = True
 _C.MCIO.Random_Saturation = True

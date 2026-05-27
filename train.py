@@ -16,6 +16,7 @@ from configs.cfg import _C as cfg
 from loaders.make_dataset import get_Dataset
 from models.make_network import get_network, set_pretrained_setting, load_checkpoint
 from losses.make_losses import get_loss_fucntion
+from losses.supcon import SupConLoss
 from utils.metric import Metric
 from torch.nn import functional as F
 
@@ -201,9 +202,14 @@ if __name__ == '__main__':
     CE_loss, val_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
     patch_align_CE_loss, val_patch_align_CE_loss = get_loss_fucntion(cfg, loss_name='CrossEntropy', device=device)
 
+    supcon_loss = SupConLoss(temperature=cfg.TRAIN.SUPCON_TAU).cuda(device)
+    supcon_gamma = cfg.TRAIN.SUPCON_GAMMA
+    logger.info(f"SupCon enabled with gamma={supcon_gamma} | tau={cfg.TRAIN.SUPCON_TAU}")
+
     net.train()
     for epoch in range(start_epoch, max_epoch):
         train_total_loss_history, train_Sim_loss_history = [], []
+        train_SupCon_loss_history = []
 
         train_loader = DataLoader(train_Dataset, batch_size, shuffle=True, 
                                   num_workers=cfg.TRAIN.NUM_WORKERS, 
@@ -231,11 +237,16 @@ if __name__ == '__main__':
                 results = net(img, target)
                 output_list = results['similarity']
                 patch_alignment_results = results['patch_alignment']
+                embeddings = results['embedding']
 
                 Similarity_loss = CE_loss(output_list, Is_real)
                 patch_alignment_loss = patch_align_CE_loss(patch_alignment_results, Is_real)
+                # SupCon: cast to FP32 — exp/log in [B,B] logits matrix is precision-sensitive
+                sc_loss = supcon_loss(embeddings.float(), Is_real)
 
-                loss = (Similarity_loss * Similarity_alpha) + (patch_alignment_loss * Patch_align_beta)
+                loss = (Similarity_loss * Similarity_alpha) \
+                     + (patch_alignment_loss * Patch_align_beta) \
+                     + (sc_loss * supcon_gamma)
 
             scaler.scale(loss).backward()
             if grad_clip is not None and grad_clip > 0:
@@ -246,6 +257,7 @@ if __name__ == '__main__':
 
             train_total_loss_history.append(loss.item())
             train_Sim_loss_history.append(Similarity_loss.item())
+            train_SupCon_loss_history.append(sc_loss.item())
             
             total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(train_Sim_loss_history).mean()
 
@@ -259,8 +271,10 @@ if __name__ == '__main__':
         train_acc, train_EER, train_HTER, train_auc, train_threshold, train_ACC_threshold, train_TPR_FPR_rate = train_metric.compute()
         # -------------- logs train ------------
         total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(train_Sim_loss_history).mean()
+        SupCon_loss_mean = float(np.asarray(train_SupCon_loss_history).mean()) if train_SupCon_loss_history else 0.0
         writer.add_scalar("train/total_loss", total_loss_mean, epoch + 1)
         writer.add_scalar("train/Sim_loss", Similarity_loss_mean * Similarity_alpha, epoch + 1)
+        writer.add_scalar("train/SupCon_loss", SupCon_loss_mean * supcon_gamma, epoch + 1)
         writer.add_scalar("train/LR", lr, epoch + 1)
         writer.add_scalar("train/train_acc", train_acc, epoch + 1)
         writer.add_scalar("train/train_EER", train_EER, epoch + 1)
