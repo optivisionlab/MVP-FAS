@@ -54,6 +54,9 @@ def infer_api(net, cfg, device, file_name, img, yolo_face_model=None, net_face_c
                 prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
                 logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - {prob3} - {'live' if prob3[0] > threshold else 'spoof'}")
                 prob = prob3[0]
+        else:
+            prob = 0.0 # auto spoof ~ vì không thể không det được face trong điều kiện môi trường bình thường
+            logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - Face not found!")
     else:
         prob = prob1[0]
         logger.info(f"uuid: {uuid} - step 1 - infer full image : {file_name} - {prob1} - {'live' if prob1[0] > threshold else 'spoof'}")
@@ -79,7 +82,7 @@ logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT", default="be
 
 logger.info("load checkpoint is {}".format(os.getenv("WEIGHT_FACE", default="best.pt")))
 net2 = get_network(cfg=cfg, device=device, backbone=os.getenv("BACKBONE", default="ViT-B/16"))
-net2 = load_checkpoint(net1, weight_path=os.getenv("WEIGHT_FACE", default="best.pt"))
+net2 = load_checkpoint(net2, weight_path=os.getenv("WEIGHT_FACE", default="best.pt"))
 net2.to(device)
 logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT_FACE", default="best.pt")))
 

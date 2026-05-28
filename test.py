@@ -70,7 +70,7 @@ if __name__ == '__main__':
     parser.add_argument("--backbone", type=str, default="RN50", help="choose subname of model")
     parser.add_argument("--batch_size", type=int, default=16, help="batch size for training")
     parser.add_argument("--seed", type=int, default=42, help="random seed for training")
-    parser.add_argument("--resume", type=bool, default=True, help='resume')
+    parser.add_argument("--resume", action='store_true', help='resume')
     parser.add_argument("--checkpoint", type=str, default='best_model.pth', help='for resume')
     parser.add_argument("--setting", type=str, default='MCIO', help='DATASET SETTING [MCIO, SFW]')
     parser.add_argument("--train_dataset", type=str, default='MIO', help='TRAIN_DATASET')
@@ -146,7 +146,7 @@ if __name__ == '__main__':
     val_batch_time = None
     batch_time = 0 # None
 
-    val_batch_iterator = iter(DataLoader(val_Dataset, batch_size, shuffle=True, num_workers=cfg.TRAIN.NUM_WORKERS, pin_memory=PIN_MEMORY))
+    val_batch_iterator = iter(DataLoader(val_Dataset, batch_size, shuffle=False, num_workers=cfg.TRAIN.NUM_WORKERS, pin_memory=PIN_MEMORY))
     val_batch_iterator_len = val_batch_iterator.__len__()
 
     net.eval()

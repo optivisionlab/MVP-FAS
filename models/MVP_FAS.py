@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-import random
 import torch.nn.functional as F
 from models.CLIP import clip
 from models.modules.slot_attention_PQTK import SlotAttention_PQTK
@@ -141,10 +140,7 @@ class mspt(nn.Module):
     def forward(self, input, target=None):
                 
         results = {'similarity': None, 'patch_alignment': None}
-        random.seed(self.cfg.MODEL.SEED)
-        # real_prompt = [f"{details[random.choice([0, 1])]} {r_txt}" for r_txt in real_templates]
-        # spoof_prompt = [f"{details[random.choice([0, 1])]} {s_txt}" for s_txt in spoof_templates]
-        
+
         spoof_texts = clip.tokenize(spoof_templates).cuda(self.device, non_blocking=True)  # tokenize
         real_texts = clip.tokenize(real_templates).cuda(self.device, non_blocking=True)  # tokenize
 

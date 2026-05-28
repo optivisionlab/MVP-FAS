@@ -47,9 +47,9 @@ class SFW_Dataset(Dataset):
         return Img
     def Image_Saturation(self,Img):
         Img = Img.astype(np.float32)
-        Img = cv2.cvtColor(Img, cv2.COLOR_BGR2HSV)
+        Img = cv2.cvtColor(Img, cv2.COLOR_RGB2HSV)
         Img[..., 1] *= np.random.uniform(0.8, 1.2)
-        Img = cv2.cvtColor(Img, cv2.COLOR_HSV2BGR).astype(np.uint8)
+        Img = cv2.cvtColor(Img, cv2.COLOR_HSV2RGB).astype(np.uint8)
         return Img
 
     def get_type_name(self, type_dict, value):
@@ -110,7 +110,7 @@ class SFW_Dataset(Dataset):
 
         Img = cv2.imread(Img_path)
         Img_shape = Img.shape
-        Img = cv2.cvtColor(Img, cv2.COLOR_RGB2BGR)
+        Img = cv2.cvtColor(Img, cv2.COLOR_BGR2RGB)
 
         if len(Img_shape) < 3:
             Img = cv2.cvtColor(Img, cv2.COLOR_GRAY2RGB)

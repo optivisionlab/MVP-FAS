@@ -62,8 +62,8 @@ if __name__ == '__main__':
     parser.add_argument("--backbone", type=str, default="RN50", help="choose subname of model")
     parser.add_argument("--batch_size", type=int, default=16, help="batch size for training")
     parser.add_argument("--seed", type=int, default=42, help="random seed for training")
-    parser.add_argument("--resume", action='store_true', help='resume')
-    parser.add_argument("--periodically", type=bool, default=False, help='save periodically')
+    parser.add_argument("--resume", action='store_true', help='use resume')
+    parser.add_argument("--periodically", action='store_true', help='use periodically')
     parser.add_argument("--checkpoint", type=str, default='best_model.pt', help='for resume/pretrained')
     parser.add_argument("--setting", type=str, default='fas', help='DATASET SETTING [MCIO, SFW, FAS, ALL]')
     parser.add_argument("--train_dataset", type=str, default='FW', help='TRAIN_DATASET')
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_size', type=int, default=256)
     parser.add_argument('--gpu_id', type=str, default=0)
     parser.add_argument('--save_path', type=str, default="runs/save_model")
-    parser.add_argument('--num_epochs', type=int, default="number of epochs")
+    parser.add_argument('--num_epochs', type=int, default=10)
     parser.add_argument("--pretrained", action='store_true', help='pretrained')
     parser.add_argument("--is_physical", action='store_true', help='is_physical')
 
@@ -352,7 +352,7 @@ if __name__ == '__main__':
             'epoch': epoch + 1,
             'state_dict': net.state_dict(),
             'optimizer': optimizer.state_dict(),
-            'performance': best_val_loss,
+            'performance': val_HTER * 100,
             'lr': lr
         }, last_ckp_path)
         print(f"💾 Last checkpoint saved {last_ckp_path}")
