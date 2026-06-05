@@ -76,7 +76,7 @@ def ping():
 
 
 @router.post("/vft-fas") # Giấy tờ ĐKKD
-async def api_vft_ekyb(
+async def api_vft_fas(
         request: Request, 
         files: List[UploadFile] = File(None), 
         urls: list[str] = Form(None), 
@@ -110,8 +110,7 @@ async def api_vft_ekyb(
         if not invalid_files: # from file
             images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
             for img, file_name in zip(images, files_name):
-                output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, 
-                                threshold=threshold, uuid=xgw_id)
+                output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, threshold=threshold, uuid=xgw_id)
                 if output['is_spoof']:
                     data['spoof'] = True
                 results.append(output)
@@ -124,8 +123,7 @@ async def api_vft_ekyb(
                     path_files.append(file_path)
                 images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
                 for img, file_name in zip(images, files_name):
-                    output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img,
-                                    threshold=threshold, uuid=xgw_id)
+                    output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, threshold=threshold, uuid=xgw_id)
                     if output['is_spoof']:
                         data['spoof'] = True
                     results.append(output)
