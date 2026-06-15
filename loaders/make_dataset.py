@@ -98,7 +98,7 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None,
     
     train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
                                 transform=transforms.Compose([
-                                    # RemoveBlackBorders(), 
+                                    RemoveBlackBorders(), 
                                     transforms.Resize(img_size), 
                                     transforms.ToTensor(), 
                                     normalize
@@ -107,7 +107,7 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None,
     
     val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
                               transform=transforms.Compose([
-                                #   RemoveBlackBorders(), 
+                                  RemoveBlackBorders(), 
                                   transforms.Resize(img_size), 
                                   transforms.ToTensor(), 
                                   normalize
