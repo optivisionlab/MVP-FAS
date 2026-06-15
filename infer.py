@@ -131,7 +131,7 @@ def infer_model(net, cfg, device, img):
     # labels = ['spoof', 'live']
     
     transform = transforms.Compose([
-        # RemoveBlackBorders(), 
+        RemoveBlackBorders(), 
         transforms.Resize((cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE)), 
         transforms.ToTensor(), 
         transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
@@ -232,7 +232,7 @@ if __name__ == '__main__':
         try:
             pred = target = ''
             img = Image.open(os.path.join(args.root_dir, path))
-            # img = img.convert('RGB')
+            img = img.convert('RGB')
 
             prob1 = infer_model(net, cfg, device, img=img)
             logger.info(f"\ninfer step 1: path: {os.path.join(args.root_dir, path)} - {prob1} - {'live' if prob1[0] > args.threshold else 'spoof'}")
