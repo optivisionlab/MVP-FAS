@@ -10,12 +10,13 @@ except:
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 
-def get_threshold(probs, grid_density):
-    Min, Max = min(probs), max(probs)
+def get_threshold(probs, grid_density=10000):
+    Min = np.min(probs)
+    Max = np.max(probs)
     thresholds = []
     for i in range(grid_density + 1):
-        thresholds.append(0.0 + i * 1.0 / float(grid_density))
-    thresholds.append(1.1)
+        thr = Min + i * (Max - Min) / float(grid_density)
+        thresholds.append(thr)
     return thresholds
 
 def eval_state(probs, labels, thr):
