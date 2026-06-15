@@ -30,25 +30,25 @@ _C.DATASET.PATH.W = 'wmca'
 _C.DATASET.USE_CELEB = False
 
 _C.TRAIN = CN()
-_C.TRAIN.MOIRE = 0.1
-_C.TRAIN.RandomLux_Real = 0.3
-_C.TRAIN.RandomCeilingLightEffect_Real = 0.5
-_C.TRAIN.RandomLux_Spoof = 0.2
-_C.TRAIN.RandomCeilingLightEffect_Spoof = 0.4
+_C.TRAIN.MOIRE = 0.05
+_C.TRAIN.RandomLux_Real = 0.1
+_C.TRAIN.RandomCeilingLightEffect_Real = 0.15
+_C.TRAIN.RandomLux_Spoof = 0.05
+_C.TRAIN.RandomCeilingLightEffect_Spoof = 0.1
 _C.TRAIN.NUM_WORKERS = 16
 _C.TRAIN.SIMILARITY_ALPHA = 1.0
 _C.TRAIN.PATCH_ALIGN_BETA = 1.0
 _C.TRAIN.WEIGHTS = [5.0, 1.0] # [spoof, live] [1.0, 1.0]
 
 _C.TRAIN.OPTIMIZER = 'adamw'
-_C.TRAIN.LR = 1e-5 # 1e-7
+_C.TRAIN.LR = 1e-6 # 1e-7
 _C.TRAIN.WEIGHT_DECAY = 0.001
 _C.TRAIN.LR_FACTOR = 0.1
 _C.TRAIN.EPOCH = 100
 _C.TRAIN.LR_STEP = [5]
 
 # Scheduler: 'multistep' (legacy) or 'cosine'
-_C.TRAIN.SCHEDULER = 'cosine'
+_C.TRAIN.SCHEDULER = 'multistep'
 _C.TRAIN.WARMUP_EPOCHS = 2
 _C.TRAIN.WARMUP_START_FACTOR = 0.01
 _C.TRAIN.LR_MIN = 1e-7
