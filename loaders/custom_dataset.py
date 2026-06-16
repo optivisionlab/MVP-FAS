@@ -177,19 +177,22 @@ class FAS_Dataset(Dataset):
         Img_path = os.path.join(self.base_dir, self.dataframe.iloc[idx, 0])
         is_spoof = self.dataframe.iloc[idx, 1] # True -> spoof, False -> live <----->  1 -> spoof, 0 -> live
         is_real = int(not is_spoof)
-
         Img = cv2.imread(Img_path)
+        if Img is None:
+            print(Img_path)
         Img_shape = Img.shape
         # Img = cv2.cvtColor(Img, cv2.COLOR_RGB2BGR)
-        Img = cv2.cvtColor(Img, cv2.COLOR_BGR2RGB)
+        # Img = cv2.cvtColor(Img, cv2.COLOR_BGR2RGB)
 
         if len(Img_shape) < 3:
             Img = cv2.cvtColor(Img, cv2.COLOR_GRAY2RGB)
+        elif Img_shape[2] == 4:
+            # Img = cv2.cvtColor(Img, cv2.COLOR_RGBA2RGB)
+            Img = cv2.cvtColor(Img, cv2.COLOR_BGRA2RGB)  # không phải RGBA2RGB
+        elif Img_shape[2] == 1:
+            Img = cv2.cvtColor(Img, cv2.COLOR_GRAY2RGB)
         else:
-            if Img_shape[2] == 4:
-                Img = cv2.cvtColor(Img, cv2.COLOR_RGBA2RGB)
-            elif Img_shape[2] == 1:
-                Img = cv2.cvtColor(Img, cv2.COLOR_GRAY2RGB)
+            Img = cv2.cvtColor(Img, cv2.COLOR_BGR2RGB)
 
         if self.is_train:
             Img = self.Flip_Saturation(Img)
@@ -266,7 +269,7 @@ class FAS_Dataset(Dataset):
                 Img = ceiling_light.apply(Img)
         
         # numpy to torch tensor and normalize
-        Img = Image.fromarray(Img) # nếu không sài cái RemoveBlackBorders
+        # Img = Image.fromarray(Img) # nếu không sài cái RemoveBlackBorders
         if self.Transform is not None:
             Img = self.Transform(Img)
 
