@@ -139,7 +139,7 @@ class mspt(nn.Module):
 
     def forward(self, input, target=None):
                 
-        results = {'similarity': None, 'patch_alignment': None}
+        results = {'similarity': None, 'patch_alignment': None, 'embedding': None}
 
         spoof_texts = clip.tokenize(spoof_templates).cuda(self.device, non_blocking=True)  # tokenize
         real_texts = clip.tokenize(real_templates).cuda(self.device, non_blocking=True)  # tokenize
@@ -169,6 +169,9 @@ class mspt(nn.Module):
 
         real_spoof_slot = real_spoof_slot.mean(dim=1)
         real_spoof_slot = self.slot_projection(real_spoof_slot)
+
+        # L2-normalized embedding for SupCon (Khosla et al., 2020)
+        results['embedding'] = F.normalize(real_spoof_slot, dim=-1)
 
         # CLIP patch align
         if target is not None:
