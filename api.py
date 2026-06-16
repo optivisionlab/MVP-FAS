@@ -13,7 +13,6 @@ from utils.utils import load_form_data, load_from_local, download_file_from_urls
 from PIL import Image
 import tempfile
 import datetime, time
-from ultralytics import YOLO
 
 
 logger = get_logger()
