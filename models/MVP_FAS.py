@@ -3,7 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 from models.CLIP import clip
 from models.modules.slot_attention_PQTK import SlotAttention_PQTK
-from models.modules.head import Classifier, Slot_Projection, Projection
+from models.modules.head import Classifier, Slot_Projection, Projection, SupConProjector
 import cv2
 import numpy as np
 
@@ -87,6 +87,10 @@ class mspt(nn.Module):
         self.slot_projection = Slot_Projection(head_type=self.head_type)
         self.patch_projection = Projection()
         self.MTPA_classifier = Classifier(512)
+        self.supcon_projector = None
+        
+        if self.cfg.TRAIN.SUPCON_MODE:
+            self.supcon_projector = SupConProjector(in_dim=512, hidden_dim=256, out_dim=128)
 
 
     def _freeze_stages(self, model, exclude_key=None):
@@ -170,8 +174,14 @@ class mspt(nn.Module):
         real_spoof_slot = real_spoof_slot.mean(dim=1)
         real_spoof_slot = self.slot_projection(real_spoof_slot)
 
-        # L2-normalized embedding for SupCon (Khosla et al., 2020)
-        results['embedding'] = F.normalize(real_spoof_slot, dim=-1)
+        # Dedicated projection head keeps the contrastive manifold separate from
+        # the classifier's input space (Khosla et al., 2020 — Section 3.2).
+        
+        if self.cfg.TRAIN.SUPCON_MODE:
+            supcon_emb = self.supcon_projector(real_spoof_slot)
+            results['embedding'] = F.normalize(supcon_emb, dim=-1)
+        else:
+            results['embedding'] = F.normalize(real_spoof_slot, dim=-1)
 
         # CLIP patch align
         if target is not None:

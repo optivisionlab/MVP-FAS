@@ -59,3 +59,24 @@ class Projection(torch.nn.Module):
     def forward(self, x):
         return self.non_linear_projection(x)
 
+
+class SupConProjector(torch.nn.Module):
+    """Dedicated projection head for SupCon loss.
+
+    Keeps the contrastive manifold separate from the classifier's input space,
+    preventing SupCon from distorting the features used for classification.
+    Discarded at inference — only the pre-projection embedding is used.
+    """
+
+    def __init__(self, in_dim=512, hidden_dim=256, out_dim=128):
+        super().__init__()
+        self.projector = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden_dim, out_dim),
+        )
+
+    def forward(self, x):
+        return self.projector(x)
+
