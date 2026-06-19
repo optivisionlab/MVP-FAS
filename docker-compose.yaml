@@ -1,7 +1,7 @@
 version: '3'
 services:
   vft-fas:
-    image: dockerhub.ovp.vn/vft/vft-fas:v3.0
+    image: vft-fas-v4.1:latest
     volumes:
       - ./runs:/app/sources/runs
       - ./logs:/app/sources/logs
@@ -19,9 +19,7 @@ services:
               capabilities: [gpu]
     environment:
       - BACKBONE=ViT-B/16
-      - WEIGHT=runs/weights/MVP_FAS_ViT-B-16_best_ckpt_260417.pt
-      - WEIGHT_FACE=runs/weights/MVP_FAS_ViT-B-16_best_ckpt_260417.pt
-      - WEIGHT_YOLO_DET=runs/weights/yolov12l-face.pt
+      - WEIGHT=runs/weights/MVP_FAS_ViT-B-16_best_ckpt_260618.pt
       - DEVICE=0
       - HOST=0.0.0.0
       - PORT=2202
