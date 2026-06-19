@@ -60,7 +60,7 @@ _C.TRAIN.GRAD_CLIP = 1.0
 # Supervised Contrastive
 _C.TRAIN.SUPCON_GAMMA = 0.2
 _C.TRAIN.SUPCON_TAU = 0.15
-_C.TRAIN.SUPCON_MODE = None
+_C.TRAIN.SUPCON_MODE = True
 
 _C.MCIO = CN()
 _C.MCIO.Random_Horizontal_Flip = True

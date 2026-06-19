@@ -12,7 +12,7 @@ from utils.exp import DownloadError
 import cv2
 import numpy as np
 import pyheif
-from PIL import Image
+from PIL import Image, ImageOps
 
 
 logger = get_logger()
@@ -111,7 +111,7 @@ async def load_form_data(files, logger, uid):
             if pathlib.Path(file.filename).suffix.lower() in lower_img_modes(os.getenv("IMG_MODE", default=".jpg,.png,.JPEG,.jpeg,.jfif").split(",")): # ['.jpg', '.png', '.JPEG', '.jpeg', '.jfif']
                 logger.info("IMAGE MODE : ID {} >>> read file >>> {}". format(str(uid), file.filename))
                 content = file.file.read()
-                image = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR) # use COLOR_CV
+                image = cv2.imdecode(np.frombuffer(content, np.uint8), cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION) # use COLOR_CV
                 image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 images.append(image)
                 files_name.append(file.filename)
@@ -142,7 +142,7 @@ async def load_from_local(files_path, logger, uid):
             if os.path.exists(file):
                 if pathlib.Path(os.path.basename(file)).suffix.lower() in lower_img_modes(os.getenv("IMG_MODE", default=".jpg,.png,.JPEG,.jpeg,.jfif").split(",")):
                     logger.info("IMAGE MODE : ID {} >>> read file >>> {}". format(str(uid), file))
-                    image = cv2.imread(file, cv2.IMREAD_COLOR) # use COLOR_CV
+                    image = cv2.imread(file, cv2.IMREAD_COLOR | cv2.IMREAD_IGNORE_ORIENTATION) # use COLOR_CV
                     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                     images.append(image)
                     files_name.append(os.path.basename(file))

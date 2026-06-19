@@ -10,7 +10,7 @@ from configs.cfg import _C as cfg
 import sys, traceback
 from utils.logging import get_logger
 from utils.utils import load_form_data, load_from_local, download_file_from_urls3
-from PIL import Image
+from PIL import Image, ImageOps
 import tempfile
 import datetime, time
 
@@ -39,6 +39,8 @@ def check_input(uid, files, urls, data):
 
 def infer_api(net, cfg, device, file_name, img, uuid='', threshold=0.5):
     pil_image = Image.fromarray(img)
+    # pil_image = pil_image.convert('RGB')
+    # pil_image = ImageOps.exif_transpose(pil_image)
     prob1 = infer_model(net, cfg, device, img=pil_image)
     prob = prob1[0]
     logger.info(f"uuid: {uuid} - step 1 - infer full image : {file_name} - {prob1} - {'live' if prob1[0] > threshold else 'spoof'}")
@@ -54,7 +56,7 @@ def infer_api(net, cfg, device, file_name, img, uuid='', threshold=0.5):
 # --- Device ---
 device = torch.device(f"cuda:{os.getenv('DEVICE', default='0')}" if torch.cuda.is_available() else "cpu")
 logger.info(f"device : {device}")
-
+logger.info(f"Config : {cfg}")
 # --- setup -----
 logger.info("load checkpoint is {}".format(os.getenv("WEIGHT", default="best.pt")))
 net1 = get_network(cfg=cfg, device=device, backbone=os.getenv("BACKBONE", default="ViT-B/16"))
