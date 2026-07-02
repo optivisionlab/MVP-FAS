@@ -83,6 +83,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', type=int, default=10)
     parser.add_argument("--pretrained", action='store_true', help='pretrained')
     parser.add_argument("--is_physical", action='store_true', help='is_physical')
+    parser.add_argument("--supcon_action", action='store_true', help='use supcon mode')
 
     args = parser.parse_args()
 
@@ -94,7 +95,7 @@ if __name__ == '__main__':
     seed = args.seed
     resume = args.resume
     checkpoint = args.checkpoint
-
+    cfg['TRAIN']['SUPCON_MODE'] = args.supcon_action
     cfg['TRAIN']['EPOCH'] = args.num_epochs
     cfg['DATASET']['SETTING'] = args.setting
     cfg['DATASET']['TRAIN_DATASET'] = args.train_dataset

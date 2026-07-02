@@ -8,7 +8,7 @@ from utils.metric import get_HTER_at_thr, get_EER_states, calculate_threshold
 import torchvision.transforms as transforms
 from torch.nn import functional as F
 from loaders.make_dataset import RemoveBlackBorders
-from PIL import Image
+from PIL import Image, ImageOps
 import logging
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
@@ -173,6 +173,7 @@ if __name__ == '__main__':
     parser.add_argument("--weights_yolo_det", type=str, default='yolo.pt', help='use weights_yolo_det for infer')
     parser.add_argument("--weights_yolo_det_face", type=str, default='yolo.pt', help='use weights_yolo_det_face for infer')
     # parser.add_argument("--weights_yolo_det_mask", type=str, default='yolo.pt', help='use weights_yolo_det_mask for infer')
+    parser.add_argument("--supcon_action", action='store_true', help='use supcon mode')
     
     
     net, net_face_crop, yolo_model, yolo_face_model, yolo_det_mask = None, None, None, None, None
@@ -181,7 +182,7 @@ if __name__ == '__main__':
     model_name = args.model
     save_name = args.backbone.replace("/", "-")
     checkpoint = args.weights
-    
+    cfg['TRAIN']['SUPCON_MODE'] = args.supcon_action
     # --- Setup ----
     os.makedirs(args.save_path, exist_ok=True)
     count = len(os.listdir(os.path.join(args.save_path))) + 1
@@ -196,7 +197,7 @@ if __name__ == '__main__':
     # Print the dictionary to see all key-value pairs
     for key, value in args_dict.items():
         logger.info("logs {}: {}".format(key, value))
-    
+    logger.info(cfg)
     # --- Device ---
     device = torch.device(f"cuda:{args.gpu_id}" if torch.cuda.is_available() else "cpu")
     logger.info(f"device : {device}")
@@ -223,7 +224,8 @@ if __name__ == '__main__':
     if args.YOLO_FACE:
         yolo_face_model = YOLO(args.weights_yolo_det_face)
     
-    test_df = pd.read_csv(args.test_csv, usecols=['path', 'is_spoof'])
+    cols = ['path', 'is_spoof']
+    test_df = pd.read_csv(args.test_csv, usecols=cols)[cols]
     preds, preds_score = [], []
     targets, targets_score = [], []
     logs_csv = []

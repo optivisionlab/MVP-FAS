@@ -19,8 +19,8 @@ def set_pretrained_setting(net, optimizer, weight_path):
     return net, optimizer, last_epoch
 
 
-def load_checkpoint(net, weight_path):
-    checkpoint_dict = torch.load(weight_path, weights_only=False)
-    net.load_state_dict(checkpoint_dict['state_dict'])
+def load_checkpoint(net, weight_path, map_location=None):
+    checkpoint_dict = torch.load(weight_path, weights_only=False, map_location=map_location)
+    net.load_state_dict(checkpoint_dict['state_dict'], strict=False)
     net.eval()
     return net

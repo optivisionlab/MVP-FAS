@@ -38,7 +38,7 @@ _C.TRAIN.RandomCeilingLightEffect_Spoof = 0.1
 _C.TRAIN.NUM_WORKERS = 16
 _C.TRAIN.SIMILARITY_ALPHA = 1.0
 _C.TRAIN.PATCH_ALIGN_BETA = 1.0
-_C.TRAIN.WEIGHTS = [5.0, 1.0] # [spoof, live] [1.0, 1.0]
+_C.TRAIN.WEIGHTS = [10.0, 1.0] # [spoof, live] [1.0, 1.0]
 
 _C.TRAIN.OPTIMIZER = 'adamw'
 _C.TRAIN.LR = 1e-6 # 1e-7
@@ -58,8 +58,9 @@ _C.TRAIN.AMP = True
 _C.TRAIN.GRAD_CLIP = 1.0
 
 # Supervised Contrastive
-_C.TRAIN.SUPCON_GAMMA = 0.5
-_C.TRAIN.SUPCON_TAU = 0.07
+_C.TRAIN.SUPCON_GAMMA = 0.2
+_C.TRAIN.SUPCON_TAU = 0.15
+_C.TRAIN.SUPCON_MODE = None
 
 _C.MCIO = CN()
 _C.MCIO.Random_Horizontal_Flip = True

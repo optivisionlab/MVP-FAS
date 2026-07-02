@@ -13,7 +13,6 @@ from utils.utils import load_form_data, load_from_local, download_file_from_urls
 from PIL import Image
 import tempfile
 import datetime, time
-from ultralytics import YOLO
 
 
 logger = get_logger()
@@ -38,28 +37,11 @@ def check_input(uid, files, urls, data):
     return invalid_files, invalid_urls
 
 
-def infer_api(net, cfg, device, file_name, img, yolo_face_model=None, net_face_crop=None, threshold=0.5, YOLO_Det=False, conf_det=0.5, uuid=''):
+def infer_api(net, cfg, device, file_name, img, uuid='', threshold=0.5):
     pil_image = Image.fromarray(img)
     prob1 = infer_model(net, cfg, device, img=pil_image)
+    prob = prob1[0]
     logger.info(f"uuid: {uuid} - step 1 - infer full image : {file_name} - {prob1} - {'live' if prob1[0] > threshold else 'spoof'}")
-    
-    if prob1[0] > threshold:
-        if YOLO_Det:
-            img_crop, _ = crop_face_with_expand(img=pil_image, yolo_face_model=yolo_face_model, device=device, conf=conf_det)
-            if img_crop is None:
-                prob = 0.0 # auto spoof ~ vì không thể không det được face trong điều kiện môi trường bình thường
-                logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - Face not found!")
-                
-            else:
-                prob3 = infer_model(net_face_crop, cfg, device, img=img_crop)
-                logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - {prob3} - {'live' if prob3[0] > threshold else 'spoof'}")
-                prob = prob3[0]
-        else:
-            prob = 0.0 # auto spoof ~ vì không thể không det được face trong điều kiện môi trường bình thường
-            logger.info(f"uuid: {uuid} - step 2 - infer crop face : {file_name} - Face not found!")
-    else:
-        prob = prob1[0]
-        logger.info(f"uuid: {uuid} - step 1 - infer full image : {file_name} - {prob1} - {'live' if prob1[0] > threshold else 'spoof'}")
     
     return {
         'source': file_name,
@@ -80,16 +62,6 @@ net1 = load_checkpoint(net1, weight_path=os.getenv("WEIGHT", default="best.pt"))
 net1.to(device)
 logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT", default="best.pt")))
 
-logger.info("load checkpoint is {}".format(os.getenv("WEIGHT_FACE", default="best.pt")))
-net2 = get_network(cfg=cfg, device=device, backbone=os.getenv("BACKBONE", default="ViT-B/16"))
-net2 = load_checkpoint(net2, weight_path=os.getenv("WEIGHT_FACE", default="best.pt"))
-net2.to(device)
-logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT_FACE", default="best.pt")))
-
-logger.info("load checkpoint is {}".format(os.getenv("WEIGHT_YOLO_DET", default="best.pt")))
-yolo_face_model = YOLO(os.getenv("WEIGHT_YOLO_DET", default="best.pt"))
-logger.info("load checkpoint is done! {}".format(os.getenv("WEIGHT_YOLO_DET", default="best.pt")))
-
 # default sync
 router = APIRouter()
 
@@ -103,13 +75,11 @@ def ping():
 
 
 @router.post("/vft-fas") # Giấy tờ ĐKKD
-async def api_vft_ekyb(
+async def api_vft_fas(
         request: Request, 
         files: List[UploadFile] = File(None), 
         urls: list[str] = Form(None), 
         threshold: float = Form(0.5),
-        threshold_det: float = Form(0.5),
-        yolo_det: bool = Form(True)
     ):
     
     uid, results = uuid.uuid1(), []
@@ -128,8 +98,8 @@ async def api_vft_ekyb(
     xgw_id = request.headers.get("Xgw-Request-Id", str(uid))
     
     logger.info(
-        "ID: {} input data: files={}, url={}, partner={}, source={}, xgw_id={}, threshold: {}, threshold_det: {}, yolo_det: {}".format(
-            uid, files, urls, partner, source, xgw_id, threshold, threshold_det, yolo_det
+        "ID: {} input data: files={}, url={}, partner={}, source={}, xgw_id={}, threshold: {}".format(
+            uid, files, urls, partner, source, xgw_id, threshold,
         )
     )
 
@@ -139,9 +109,7 @@ async def api_vft_ekyb(
         if not invalid_files: # from file
             images, files_name = await load_form_data(files=files, logger=logger, uid=uid)
             for img, file_name in zip(images, files_name):
-                output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det, 
-                                threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
-                                uuid=xgw_id)
+                output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, threshold=threshold, uuid=xgw_id)
                 if output['is_spoof']:
                     data['spoof'] = True
                 results.append(output)
@@ -154,9 +122,7 @@ async def api_vft_ekyb(
                     path_files.append(file_path)
                 images, files_name = await load_from_local(files_path=path_files, logger=logger, uid=uid)
                 for img, file_name in zip(images, files_name):
-                    output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, YOLO_Det=yolo_det,
-                                    threshold=threshold, yolo_face_model=yolo_face_model, net_face_crop=net2, 
-                                    uuid=xgw_id)
+                    output = infer_api(net=net1, cfg=cfg, device=device, file_name=file_name, img=img, threshold=threshold, uuid=xgw_id)
                     if output['is_spoof']:
                         data['spoof'] = True
                     results.append(output)

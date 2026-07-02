@@ -7,6 +7,7 @@ import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms as transforms
+import time
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -322,7 +323,7 @@ def create_visualization(img_path, model, cfg, device, save_path, method='gradca
     img_display = img.copy()
 
     transform = transforms.Compose([
-        RemoveBlackBorders(),
+        # RemoveBlackBorders(),  # Commented out to match infer.py preprocessing
         transforms.Resize((cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
@@ -336,8 +337,17 @@ def create_visualization(img_path, model, cfg, device, save_path, method='gradca
         outputs = model(img_tensor)
         sim = outputs['similarity']
         prob = F.softmax(sim, dim=-1).cpu().numpy()[0]
-        live_prob = prob[-1]
-        spoof_prob = prob[0]
+        # Model order: [spoof, live] based on text_features concatenation
+        spoof_prob = prob[0]   # First element is spoof
+        live_prob = prob[1]    # Second element is live (or prob[-1] if only 2 classes)
+
+        # Debug: print all probabilities
+        print(f"DEBUG: Raw similarity: {sim.cpu().numpy()}")
+        print(f"DEBUG: Softmax probs: {prob}")
+        print(f"DEBUG: Number of classes: {len(prob)}")
+        print(f"DEBUG: Spoof prob [0]: {spoof_prob}")
+        print(f"DEBUG: Live prob [1]: {live_prob}")
+        print(f"DEBUG: Live prob [-1]: {prob[-1]}")
 
     # Generate heatmap based on method
     if method == 'gradcam':
@@ -425,11 +435,15 @@ if __name__ == '__main__':
     # Load model
     print(f"Loading model from: {args.weights}")
     net = get_network(cfg=cfg, args=args, net_name=args.model, device=device, backbone=args.backbone)
-    net = load_checkpoint(net, weight_path=args.weights)
+    net = load_checkpoint(net, weight_path=args.weights, map_location=device)
     net.to(device)
     net.eval()
     print("Model loaded successfully")
 
-    # Create visualization
-    save_path = os.path.join(args.save_path, f"{os.path.basename(args.image).split('.')[0]}_heatmap.png")
+    # Create visualization with timestamp and parent folder name
+    timestamp_ms = int(time.time() * 1000)
+    image_path = args.image
+    image_basename = os.path.basename(image_path).split('.')[0]
+    parent_folder = os.path.basename(os.path.dirname(image_path))
+    save_path = os.path.join(args.save_path, f"{parent_folder}_{image_basename}_heatmap_{timestamp_ms}.png")
     create_visualization(args.image, net, cfg, device, save_path, method=args.method)

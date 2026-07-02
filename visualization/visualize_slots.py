@@ -1,4 +1,5 @@
 import os
+import sys
 import argparse
 import torch
 import numpy as np
@@ -6,6 +7,11 @@ import cv2
 import matplotlib.pyplot as plt
 from PIL import Image
 import torchvision.transforms as transforms
+import time
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 from configs.cfg import _C as cfg
 from models.make_network import get_network, load_checkpoint
 from loaders.make_dataset import RemoveBlackBorders
@@ -58,7 +64,7 @@ def visualize_slot_attention_grid(img_path, model, cfg, device, save_path,
     img_display = img.copy()
 
     transform = transforms.Compose([
-        RemoveBlackBorders(),
+        #RemoveBlackBorders(),  # Commented out to match infer.py preprocessing
         transforms.Resize((cfg.MODEL.IMG_SIZE, cfg.MODEL.IMG_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize(mean=cfg.DATASET.Mean, std=cfg.DATASET.Std)
@@ -451,8 +457,12 @@ if __name__ == '__main__':
         save_path = os.path.join(args.save_path, "slot_visualization_multi.png")
         create_multi_row_visualization(args.images, net, cfg, device, save_path, args.prompts)
     elif args.image:
-        # Single image visualization
-        save_path = os.path.join(args.save_path, f"{os.path.basename(args.image).split('.')[0]}_slots.png")
+        # Single image visualization with timestamp and parent folder name
+        timestamp_ms = int(time.time() * 1000)
+        image_path = args.image
+        image_basename = os.path.basename(image_path).split('.')[0]
+        parent_folder = os.path.basename(os.path.dirname(image_path))
+        save_path = os.path.join(args.save_path, f"{parent_folder}_{image_basename}_slots_{timestamp_ms}.png")
         visualize_slot_attention_grid(args.image, net, cfg, device, save_path, args.prompts)
     else:
         print("Error: Please provide --image or --images")
