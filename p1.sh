@@ -22,5 +22,6 @@ python train.py \
 --setting "all" \
 --gpu_id 0 \
 --num_epochs 100 \
---save_path "runs/cross_domain" 
+--save_path "runs/cross_domain" \
+--is_physical 
 done
