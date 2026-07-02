@@ -215,4 +215,4 @@ CDCNpp*
 csv_data
 save_model
 logs
-*.sh
+visualization/analysis_output
