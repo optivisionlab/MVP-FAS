@@ -8,7 +8,7 @@ from utils.metric import get_HTER_at_thr, get_EER_states, calculate_threshold
 import torchvision.transforms as transforms
 from torch.nn import functional as F
 from loaders.make_dataset import RemoveBlackBorders
-from PIL import Image
+from PIL import Image, ImageOps
 import logging
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
@@ -224,7 +224,8 @@ if __name__ == '__main__':
     if args.YOLO_FACE:
         yolo_face_model = YOLO(args.weights_yolo_det_face)
     
-    test_df = pd.read_csv(args.test_csv, usecols=['path', 'is_spoof'])
+    cols = ['path', 'is_spoof']
+    test_df = pd.read_csv(args.test_csv, usecols=cols)[cols]
     preds, preds_score = [], []
     targets, targets_score = [], []
     logs_csv = []
