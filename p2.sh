@@ -4,10 +4,11 @@
 # wmca_rgb              8280
 # Name: count, dtype: int64
 
-KEY_TRAIN=("CASIA_SURF_images,wmca_rgb", "cefa_image,wmca_rgb", "CASIA_SURF_images,cefa_image")
+KEY_TRAIN=("CASIA_SURF_images,wmca_rgb" "cefa_image,wmca_rgb" "CASIA_SURF_images,cefa_image")
 
-KEY_VAL=("cefa_image", "CASIA_SURF_images", "wmca_rgb")
+KEY_VAL=("cefa_image" "CASIA_SURF_images" "wmca_rgb")
 
+PRE_TRAIN_PATH=("MVP_FAS_P2_C.pth" "MVP_FAS_P2_S.pth" "MVP_FAS_P2_W.pth")
 # for i in "${!KEY_TRAIN[@]}"; do
 #     echo ${KEY_TRAIN[i]}
 #     echo ${KEY_VAL[i]}
@@ -30,5 +31,8 @@ for i in "${!KEY_TRAIN[@]}"; do
         --gpu_id 0 \
         --num_epochs 300 \
         --save_path "/u01/vision/data/fas/solution/runs/protocol2/clip$save_clip" \
-        --supcon_action 
+        --supcon_action \
+        # --checkpoint "/data/fas/solution/MVP-FAS/runs/weights/${PRE_TRAIN_PATH[i]}" \
+        # --pretrained
+       
 done
