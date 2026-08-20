@@ -83,8 +83,6 @@ if __name__ == '__main__':
     parser.add_argument('--num_epochs', type=int, default=10)
     parser.add_argument("--pretrained", action='store_true', help='pretrained')
     parser.add_argument("--is_physical", action='store_true', help='is_physical')
-    parser.add_argument("--supcon_action", action='store_true', help='use supcon mode')
-
     args = parser.parse_args()
 
     now_time = datetime.datetime.now()
@@ -95,7 +93,6 @@ if __name__ == '__main__':
     seed = args.seed
     resume = args.resume
     checkpoint = args.checkpoint
-    cfg['TRAIN']['SUPCON_MODE'] = args.supcon_action
     cfg['TRAIN']['EPOCH'] = args.num_epochs
     cfg['DATASET']['SETTING'] = args.setting
     cfg['DATASET']['TRAIN_DATASET'] = args.train_dataset
@@ -205,7 +202,7 @@ if __name__ == '__main__':
 
     supcon_loss = SupConLoss(temperature=cfg.TRAIN.SUPCON_TAU).cuda(device)
     supcon_gamma = cfg.TRAIN.SUPCON_GAMMA
-    logger.info(f"SupCon enabled with gamma={supcon_gamma} | tau={cfg.TRAIN.SUPCON_TAU}")
+    logger.info(f"SupCon gamma={supcon_gamma} | tau={cfg.TRAIN.SUPCON_TAU}")
 
     net.train()
     for epoch in range(start_epoch, max_epoch):
@@ -271,19 +268,20 @@ if __name__ == '__main__':
             
         train_acc, train_EER, train_HTER, train_auc, train_threshold, train_ACC_threshold, train_TPR_FPR_rate = train_metric.compute()
         # -------------- logs train ------------
+        actual_lr = optimizer.param_groups[0]['lr']
         total_loss_mean, Similarity_loss_mean = np.asarray(train_total_loss_history).mean(), np.asarray(train_Sim_loss_history).mean()
         SupCon_loss_mean = float(np.asarray(train_SupCon_loss_history).mean()) if train_SupCon_loss_history else 0.0
         writer.add_scalar("train/total_loss", total_loss_mean, epoch + 1)
         writer.add_scalar("train/Sim_loss", Similarity_loss_mean * Similarity_alpha, epoch + 1)
         writer.add_scalar("train/SupCon_loss", SupCon_loss_mean * supcon_gamma, epoch + 1)
-        writer.add_scalar("train/LR", lr, epoch + 1)
-        writer.add_scalar("train/train_acc", train_acc, epoch + 1)
-        writer.add_scalar("train/train_EER", train_EER, epoch + 1)
-        writer.add_scalar("train/train_HTER", train_HTER, epoch + 1)
-        writer.add_scalar("train/train_auc", train_auc, epoch + 1)
-        writer.add_scalar("train/train_threshold", train_threshold, epoch + 1)
-        writer.add_scalar("train/train_ACC_threshold", train_ACC_threshold, epoch + 1)
-        writer.add_scalar("train/train_TPR_FPR_rate", train_TPR_FPR_rate, epoch + 1)
+        writer.add_scalar("train/LR", actual_lr, epoch + 1)
+        writer.add_scalar("train/train_acc", train_acc * 100, epoch + 1)
+        writer.add_scalar("train/train_EER", train_EER * 100, epoch + 1)
+        writer.add_scalar("train/train_HTER", train_HTER * 100, epoch + 1)
+        writer.add_scalar("train/train_auc", train_auc * 100, epoch + 1)
+        writer.add_scalar("train/train_threshold", train_threshold * 100, epoch + 1)
+        writer.add_scalar("train/train_ACC_threshold", train_ACC_threshold * 100, epoch + 1)
+        writer.add_scalar("train/train_TPR_FPR_rate", train_TPR_FPR_rate * 100, epoch + 1)
         
         line = '\n[Train] Epoch [{}/{}]: total_loss: {:.4f}, Sim_loss: {:.4f}\n' \
                 'HTER: {:.4f}, EER: {:.4f}, \n' \
@@ -292,7 +290,7 @@ if __name__ == '__main__':
                 epoch + 1, max_epoch, total_loss_mean, Similarity_loss_mean * Similarity_alpha, 
                 train_HTER * 100, train_EER * 100, 
                 train_auc * 100, train_TPR_FPR_rate * 100, train_acc * 100, 
-                train_ACC_threshold * 100, train_threshold, lr)
+                train_ACC_threshold * 100, train_threshold, actual_lr)
         logger.info(line)
         
         if validation == True:
@@ -346,7 +344,7 @@ if __name__ == '__main__':
                 writer.add_scalar("val/TPR@FPR", val_TPR_FPR_rate * 100, epoch + 1)
                 writer.add_scalar("val/Acc", val_acc * 100, epoch + 1)
                 writer.add_scalar("val/val_ACC_threshold", val_ACC_threshold * 100, epoch + 1)
-                writer.add_scalar("val/val_threshold_history", val_threshold, epoch + 1)
+                writer.add_scalar("val/val_threshold_history", val_threshold * 100, epoch + 1)
 
                 line = '\n[VAL] Epoch [{}/{}]: total_loss: {:.4f}, Sim_loss: {:.4f} \n' \
                         'HTER: {:.4f}, EER: {:.4f} \n' \
@@ -355,7 +353,7 @@ if __name__ == '__main__':
                 epoch + 1, max_epoch, val_total_loss_mean, val_sim_loss_mean * Similarity_alpha, 
                 val_HTER * 100, val_EER * 100, 
                 val_auc * 100, val_TPR_FPR_rate * 100, val_acc * 100, 
-                val_ACC_threshold * 100, val_threshold, lr)
+                val_ACC_threshold * 100, val_threshold, actual_lr)
                 logger.info(line)
                 
                 # for best NME
@@ -390,7 +388,7 @@ if __name__ == '__main__':
                 torch.save({
                     'epoch': epoch + 1,
                     'state_dict': net.state_dict(),
-                    'performance': best_val_loss,
+                    'performance': val_HTER * 100,
                     'optimizer': optimizer.state_dict(),
                 }, os.path.join(save_folder, 'weights', model_name + '_' + save_name + '_epoch_' + str(epoch + 1) + '.pt'))
                 print ("Save periodically model checkpoint to: ", os.path.join(save_folder, model_name + '_' + save_name + '_epoch_' + str(epoch + 1) + '.pt'))
@@ -410,11 +408,3 @@ if __name__ == '__main__':
         lr = scheduler.state_dict()['_last_lr'][0]
 
     logging.shutdown()
-
-
-
-
-
-
-
-
