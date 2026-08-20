@@ -1,10 +1,6 @@
 import torch
 from torch import nn
-from torch.nn import init
 import torch.nn.functional as F
-# torch.autograd.set_detect_anomaly(True)
-from utils.visualization import visualize_attn
-import math
 class SlotAttention_PQTK(nn.Module):
     def __init__(self, dim, iters=3, eps=1e-8, hidden_dim=128):
         super().__init__()
