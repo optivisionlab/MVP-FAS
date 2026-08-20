@@ -73,10 +73,24 @@ class SupConProjector(torch.nn.Module):
         self.projector = nn.Sequential(
             nn.Linear(in_dim, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
-            nn.ReLU(inplace=True),
+            # nn.ReLU(inplace=True),
+            nn.GELU(),
             nn.Linear(hidden_dim, out_dim),
         )
+        
+        # refine block: MLP giữ nguyên chiều in_dim để cộng residual được
+        self.mlp = nn.Sequential(
+            nn.Linear(in_dim, hidden_dim),
+            nn.ReLU(inplace=True),
+            nn.Linear(hidden_dim, in_dim)
+        )
+        
+        self.norm_pre_ff = nn.LayerNorm(in_dim)
 
     def forward(self, x):
+        # residual refine trong không gian in_dim (giống slot attention)
+        # print("forward X : ", x.shape)
+
+        x = x + self.mlp(self.norm_pre_ff(x))
         return self.projector(x)
 
