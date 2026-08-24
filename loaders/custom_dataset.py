@@ -174,8 +174,8 @@ class FAS_Dataset(Dataset):
     def __getitem__(self, idx):
         # db_slic = copy.deepcopy(self.database[idx])
 
-        Img_path = os.path.join(self.base_dir, self.dataframe.iloc[idx, 0])
-        is_spoof = self.dataframe.iloc[idx, 1] # True -> spoof, False -> live <----->  1 -> spoof, 0 -> live
+        Img_path = os.path.join(self.base_dir, self.dataframe['path'].iloc[idx])
+        is_spoof = self.dataframe['is_spoof'].iloc[idx] # True -> spoof, False -> live <----->  1 -> spoof, 0 -> live
         is_real = int(not is_spoof)
         Img = cv2.imread(Img_path)
         if Img is None:
@@ -279,6 +279,8 @@ class FAS_Dataset(Dataset):
             # 'Domain':  domain,
             # 'Attack_type': attack_type,
         }
+        if 'uuid' in self.dataframe.columns:
+            meta['uuid'] = self.dataframe['uuid'].iloc[idx]
         return Img, meta
 
 if __name__ == '__main__':
