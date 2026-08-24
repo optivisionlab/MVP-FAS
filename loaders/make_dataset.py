@@ -65,8 +65,8 @@ def get_SFW_dataset(cfg,train='SF',test='W',img_size= (224, 224), normalize=None
 
 def get_FAS_dataset(args, cfg, normalize=None, img_size=(224, 224)):
 
-    train_df = shuffle(pd.read_csv(args.train_csv, usecols=['path', 'is_spoof']), random_state=args.seed)
-    val_df = shuffle(pd.read_csv(args.val_csv, usecols=['path', 'is_spoof']), random_state=args.seed)
+    train_df = shuffle(pd.read_csv(args.train_csv, usecols=['uuid', 'path', 'is_spoof']), random_state=args.seed)
+    val_df = shuffle(pd.read_csv(args.val_csv, usecols=['uuid', 'path', 'is_spoof']), random_state=args.seed)
 
     train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_df, base_dir=args.root_dir, 
                                 transform=transforms.Compose([transforms.ToTensor(), transforms.Resize(img_size), normalize]), 
@@ -92,20 +92,24 @@ def get_ALL_dataset(args, cfg, normalize=None, img_size=(224, 224), logger=None,
     
     train_full_df.to_csv(os.path.join(cfg.LOG.SAVEDF, "train.csv"), index=False)
     val_full_df.to_csv(os.path.join(cfg.LOG.SAVEDF, "val.csv"), index=False)
-    
+
     logger.info(f"Total train_full_df : {train_full_df['is_spoof'].value_counts()}")
     logger.info(f"Total val_full_df: {val_full_df['is_spoof'].value_counts()}")
-    
-    train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
+
+    # keep 'uuid' when present, so frames can be grouped into videos by uuid
+    # instead of regexing the frame index off the image path
+    cols = ['uuid', 'path', 'is_spoof']
+
+    train_dataset = FAS_Dataset(cfg=cfg, dataframe=train_full_df[cols], base_dir=args.root_dir,
                                 transform=transforms.Compose([
-                                    RemoveBlackBorders(), 
-                                    transforms.Resize(img_size), 
-                                    transforms.ToTensor(), 
+                                    RemoveBlackBorders(),
+                                    transforms.Resize(img_size),
+                                    transforms.ToTensor(),
                                     normalize
-                                ]), 
+                                ]),
                                 is_train=True, is_physical=is_physical)
-    
-    val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df[['path', 'is_spoof']], base_dir=args.root_dir, 
+
+    val_dataset = FAS_Dataset(cfg=cfg, dataframe=val_full_df[cols], base_dir=args.root_dir,
                               transform=transforms.Compose([
                                   RemoveBlackBorders(), 
                                   transforms.Resize(img_size), 
