@@ -1,4 +1,5 @@
 import math
+import re
 import numpy as np
 import torch
 
@@ -6,9 +7,19 @@ try:
     from scipy.integrate import simps
 except:
     from scipy.integrate import simpson as simps
-    
+
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
+
+# Strips the trailing frame index (frame0, frame1, frame_xx, ...) and extension
+# from a frame's image path, so every frame sampled from the same video collapses
+# to the same key (e.g. ".../1_flip_frame_0.png" and ".../1_flip_frame_1.png"
+# both map to ".../1_flip").
+_FRAME_SUFFIX_RE = re.compile(r'_?frame_?\d+(\.[A-Za-z0-9]+)?$', re.IGNORECASE)
+
+
+def get_video_id(img_path):
+    return _FRAME_SUFFIX_RE.sub('', img_path)
 
 def get_threshold(probs, grid_density=10000):
     Min = np.min(probs)
@@ -51,7 +62,7 @@ def get_EER_states(probs, labels, grid_density=10000):
         dist = math.fabs(FRR - FAR)
         FAR_list.append(FAR)
         FRR_list.append(FRR)
-        if dist <= min_dist:
+        if dist < min_dist:
             min_dist = dist
             min_dist_states = [FAR, FRR, thr]
     EER = (min_dist_states[0] + min_dist_states[1]) / 2.0
@@ -104,20 +115,42 @@ class Metric():
     def __init__(self):
         self.labels = []
         self.probs = []
+        self.video_ids = []
 
-    def update(self, GT, pred):
+    def update(self, GT, pred, video_ids=None):
         self.labels.append(GT)
         self.probs.append(pred)
+        if video_ids is not None:
+            self.video_ids.extend(video_ids)
 
-    def compute(self):
+    def compute(self, ext_threshold=None):
         labels = np.concatenate(self.labels)
         probs = np.concatenate(self.probs)
 
+        if self.video_ids:
+            assert len(self.video_ids) == len(probs), \
+                "video_ids must be provided for every update() call, or none at all"
+
+            # Step 2+3: gộp per-frame prob/label theo videoID, rồi lấy trung bình
+            # prob của các frame cùng video làm prob cuối cùng của video đó.
+            prob_dict, label_dict = {}, {}
+            for vid, p, l in zip(self.video_ids, probs, labels):
+                prob_dict.setdefault(vid, []).append(p)
+                label_dict.setdefault(vid, l)
+
+            video_ids = list(prob_dict.keys())
+            probs = np.array([sum(prob_dict[vid]) / len(prob_dict[vid]) for vid in video_ids])
+            labels = np.array([label_dict[vid] for vid in video_ids])
+
         acc = ((probs > 0.5) == labels).mean()
 
+        # own-set EER/threshold is always reported for reference, but HTER must be
+        # measured at a threshold fixed on a *different* split (ext_threshold) —
+        # otherwise it collapses to EER (same probs/labels picked the threshold).
         eer, threshold, _, _ = get_EER_states(probs, labels)
-        hter, far, frr = get_HTER_at_thr(probs, labels, threshold)
-        acc_thr, _ = calculate_threshold(probs, labels, threshold)
+        hter_threshold = threshold if ext_threshold is None else ext_threshold
+        hter, far, frr = get_HTER_at_thr(probs, labels, hter_threshold)
+        acc_thr, _ = calculate_threshold(probs, labels, hter_threshold)
 
         auc = -1
         tpr_fpr = -1
