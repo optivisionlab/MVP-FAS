@@ -276,11 +276,11 @@ class FAS_Dataset(Dataset):
         meta = {
             'Img_path': Img_path,
             'Is_real': is_real,
+            'uuid': self.dataframe['uuid'].iloc[idx]
             # 'Domain':  domain,
             # 'Attack_type': attack_type,
         }
-        if 'uuid' in self.dataframe.columns:
-            meta['uuid'] = self.dataframe['uuid'].iloc[idx]
+
         return Img, meta
 
 if __name__ == '__main__':
