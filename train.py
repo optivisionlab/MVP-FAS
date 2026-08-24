@@ -142,7 +142,7 @@ if __name__ == '__main__':
     last_epoch = -1
     validation = True
     best_val_loss = np.inf
-    best_HTER = np.inf
+    best_EER = np.inf
     save_periodically = args.periodically
     period = 10
     PIN_MEMORY = True
@@ -262,9 +262,10 @@ if __name__ == '__main__':
             # prob = F.softmax(output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
             prob = F.softmax(output_list.detach(), dim=-1)[:, -1].cpu().numpy()
             labels = Is_real.detach().cpu().numpy()
+            video_ids = target['uuid']
 
             # accumulate
-            train_metric.update(labels, prob)
+            train_metric.update(labels, prob, video_ids)
             
         train_acc, train_EER, train_HTER, train_auc, train_threshold, train_ACC_threshold, train_TPR_FPR_rate = train_metric.compute()
         # -------------- logs train ------------
@@ -329,11 +330,14 @@ if __name__ == '__main__':
                     # prob = F.softmax(val_output_list, dim=-1).cpu().data.numpy()[:, -1].tolist()
                     prob = F.softmax(val_output_list.detach(), dim=-1)[:, -1].cpu().numpy()
                     labels = val_Is_real.detach().cpu().numpy()
-                    
+                    val_video_ids = val_target['uuid']
+
                     # accumulate
-                    val_metric.update(labels, prob)
+                    val_metric.update(labels, prob, val_video_ids)
                 
-                val_acc, val_EER, val_HTER, val_auc, val_threshold, val_ACC_threshold, val_TPR_FPR_rate = val_metric.compute()
+                # HTER must be measured at a threshold fixed on train, not re-derived from val's
+                # own EER — else it collapses to val_EER and best-checkpoint selection just tracks that.
+                val_acc, val_EER, val_HTER, val_auc, val_threshold, val_ACC_threshold, val_TPR_FPR_rate = val_metric.compute(ext_threshold=train_threshold)
                 # ------ logs ------ 
                 val_total_loss_mean, val_sim_loss_mean = np.asarray(val_total_loss_history).mean(), np.asarray(val_Sim_loss_history).mean()
                 writer.add_scalar("val/total_loss", val_total_loss_mean, epoch + 1)
@@ -357,11 +361,11 @@ if __name__ == '__main__':
                 logger.info(line)
                 
                 # for best NME
-                if (val_HTER < best_HTER):
+                if (val_EER < best_EER):
                     print('\n')
-                    new_update = f'Congratulation Best HTER is updated, best_HTER: {best_HTER * 100} upto val_HTER: {val_HTER * 100}'
+                    new_update = f'Congratulation Best EER is updated, best_EER: {best_EER * 100} upto val_EER: {val_EER * 100}'
                     logger.info(new_update)
-                    best_HTER = val_HTER
+                    best_EER = val_EER
                     logger.info('=> saving checkpoint to {}'.format(os.path.join(save_folder, model_name + '_' + save_name + '_best.pt')))
 
                     # save_threshold = 0.05
@@ -370,12 +374,12 @@ if __name__ == '__main__':
                     # elif cfg.DATASET.SETTING == 'MCIO':
                     #     save_threshold = 0.10
                     #
-                    # if best_HTER <= save_threshold:
+                    # if best_EER <= save_threshold:
                     best_ckpt_path = os.path.join(save_folder, 'weights', model_name + '_' + save_name + '_best_ckpt.pt')
                     torch.save({
                         'epoch': epoch + 1,
                         'state_dict': net.state_dict(),
-                        'performance': best_HTER * 100,
+                        'performance': best_EER * 100,
                         'optimizer': optimizer.state_dict(),
                     }, best_ckpt_path)
                     
