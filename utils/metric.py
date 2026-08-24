@@ -11,15 +11,6 @@ except:
 from sklearn.metrics import roc_auc_score
 from sklearn.metrics import roc_curve
 
-# Strips the trailing frame index (frame0, frame1, frame_xx, ...) and extension
-# from a frame's image path, so every frame sampled from the same video collapses
-# to the same key (e.g. ".../1_flip_frame_0.png" and ".../1_flip_frame_1.png"
-# both map to ".../1_flip").
-_FRAME_SUFFIX_RE = re.compile(r'_?frame_?\d+(\.[A-Za-z0-9]+)?$', re.IGNORECASE)
-
-
-def get_video_id(img_path):
-    return _FRAME_SUFFIX_RE.sub('', img_path)
 
 def get_threshold(probs, grid_density=10000):
     Min = np.min(probs)
