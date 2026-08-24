@@ -12,13 +12,13 @@ spoof_templates = [
     'fake face',
     'replay attack face',
     # 'video replay face',
-    'screen replay face',
+    # 'screen replay face',
     'printed photo face spoof',
     # 'print attack face',
     # '2D attack face',
-    'silicone face spoof',
-    'latex face spoof',
-    '3D mask face spoof',
+    # 'silicone face spoof',
+    # 'latex face spoof',
+    # '3D mask face spoof',
     # 'full mask face spoof',
     # 'plastic mask face',
     # 'paper mask face spoof',
@@ -164,10 +164,11 @@ class mspt(nn.Module):
         real_spoof_slot = self.MVSlot(patch + cls_embedding.unsqueeze(1), text_features)
 
         real_spoof_slot = real_spoof_slot.mean(dim=1)
-        real_spoof_slot = self.slot_projection(real_spoof_slot)
 
         supcon_emb = self.supcon_projector(real_spoof_slot)
         results['embedding'] = F.normalize(supcon_emb, dim=-1)
+
+        real_spoof_slot = self.slot_projection(real_spoof_slot)
 
         # CLIP patch align
         if target is not None:
